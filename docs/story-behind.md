@@ -2,7 +2,7 @@
 
 ## Why built it?
 
-It all started with a geninue question when I came across RHEL EC2 hosted GitLab servers working as a member of the infra team: does it really take thousands of dollars to host GitLab?
+It all started with a genuine question when I came across RHEL EC2 hosted GitLab servers working as a member of the infra team: does it really take thousands of dollars to host GitLab?
 
 Licensing, enterprise OS, oversized instance flavors, storage premiums—layers of cost stacked on top of layers of inertia.  The kind of setup that makes you wonder if the wasted budget could’ve solved world hunger several times over. The punchline? They weren’t using CI. They didn't even write docs.
 
@@ -12,8 +12,7 @@ In case you're wondering, yes, it can pull it off. You can check the `legacy` br
 
 After enough iterations, frustrations, and rebuilds, this stack grew into what it is now: a domain-driven home server architecture that actually behaves.
 
-![The said Pi in its full glory]
-(docs/images/pi5.png)
+![The said Pi in its full glory](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/pi5.png)
 
 ## Why stepped away from GitLab CE?
 
@@ -35,11 +34,12 @@ I built my own config-registry layer because I want the Pi to behave like a mini
 ## Monitoring
 
 This isn’t a data center, but it’s still a living system. Things break. Temperatures spike. Runners misbehave. It deserves a monitoring stack as much as every system does. And hey, Prometheus and Grafana are free to use.
-(docs/images/dashboard-domain-1.png)
-(docs/images/dashboard-domain-2.png)
-(docs/images/dashboard-domain-3.png)
-(docs/images/dashboard-domain-4.png)
-(docs/images/dashboard-domain-5.png)
+![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-1.png)
+![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-2.png)
+![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-3.png)
+![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-4.png)
+![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-5.png)
+![Runner Dashboard](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-runners.png)
 
 ## Hard lessons learned
 
