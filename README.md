@@ -4,7 +4,7 @@
 Pi Forge rebuilds a former GitLab-centric Raspberry Pi homelab into a domain-driven deployment stack.
 Every domain—Forgejo, PostgreSQL, Woodpecker, monitoring, adblocker, registry is rendered from Jinja templates and deployed via Docker Compose.
 Configuration is declarative; generated artifacts live under `generated/` and are never committed.
-The old maze of scripts lives in the `legacy` branch for keepsake.
+The old maze of scripts lives in the `legacy` branch for keepsake. For more details, see `docs/story-behind.md`
 
 ## Configuration Registry
 This repo centralizes configuration so templates always render from a single source of truth:
