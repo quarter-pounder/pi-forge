@@ -14,6 +14,8 @@ After enough iterations, frustrations, and rebuilds, this stack grew into what i
 
 ![The said Pi in its full glory](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/pi5.png)
 
+---
+
 ## Why stepped away from GitLab CE?
 
 At some point the heavy Omnibus stack turned into a swamp.
@@ -21,6 +23,8 @@ At some point the heavy Omnibus stack turned into a swamp.
 Puma, the application server, demanded tuning that assumes x86. Gitaly running like a separate microservice sluster. Is GitLab CE's internal nginx bindind the port anoter service trying to use? Did they change the config convention about exposing metrics to external monitoring? All of it glued together inside the Omnibus package with expectations designed for a VM with multiple vCPUs, definitely not for a single node setup.
 
 Fumbling knee-deep in Puma configs, Sidekiq queue tuning guides, I swapped to Forgejo because it makes sense. It's a Gitea fork. Lightweight, fast, sane defaults... And you can swap between Forgejo Actions and GitHub Actions with minimal effects.
+
+---
 
 ## Why bother with another layer to set config?
 
@@ -31,19 +35,31 @@ So here I am, we have Helm at home.
 
 I built my own config-registry layer because I want the Pi to behave like a miniature cloud environment: predictable, boring, rebuildable.
 
+---
+
 ## Monitoring
 
 This isn’t a data center, but it’s still a living system. Things break. Temperatures spike. Runners misbehave. It deserves a monitoring stack as much as every system does. And hey, Prometheus and Grafana are free to use.
+
+Below are some screenshots of the dashboard.
+
 ![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-1.png)
+
 ![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-2.png)
+
 ![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-3.png)
+
 ![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-4.png)
+
 ![Grafana Dashboard Screenshot](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-domain-5.png)
+
 ![Runner Dashboard](https://github.com/quarter-pounder/pi-forge/blob/main/docs/images/dashboard-runners.png)
+
+---
 
 ## Hard lessons learned
 
-Below are a some notes I took as I built this repo. You might want to skip them because they're very lengthy.
+Here are a some notes I took as I built this repo. They are for future me to read. You might want to skip them because they're very lengthy.
 
 1. Firmware has opinions
 
