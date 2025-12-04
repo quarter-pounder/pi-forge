@@ -17,15 +17,15 @@ Re-running normal bootstrap steps will not overwrite user data or damage an exis
 ```mermaid
 graph TD
   subgraph Optional["Optional - NVMe preparation"]
-    A[00 - Flash NVMe (fresh image)]
-    B[00 - Clone SD → NVMe (live)]
+    A["00 - Flash NVMe (fresh image)"]
+    B["00 - Clone SD → NVMe (live)"]
   end
-  C[01 - Preflight Checks]
-  D[02 - Install Core Packages]
-  E[03 - Install Docker]
-  F[04 - Optimize Docker]
-  G[05 - Verify Setup]
-  H[06 - Security Hardening]
+  C["01 - Preflight Checks"]
+  D["02 - Install Core Packages"]
+  E["03 - Install Docker"]
+  F["04 - Optimize Docker"]
+  G["05 - Verify Setup"]
+  H["06 - Security Hardening"]
   A --> C
   B --> C
 ```
