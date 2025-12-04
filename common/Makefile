@@ -3,7 +3,7 @@ SHELL := /bin/bash
 .SILENT:
 .DEFAULT_GOAL := help
 
-.PHONY: help env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest vault-create vault-edit vault-view check-secrets status
+.PHONY: help env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest vault-create vault-edit vault-view check-secrets status check-dependencies check-domain-running
 
 ENV ?= dev
 DOMAIN ?= forgejo
@@ -55,9 +55,24 @@ help:
 	@echo "  make render-github-runner NAME=<name> - Render compose file for runner"
 	@echo "  make deploy-github-runner NAME=<name> - Deploy a runner"
 	@echo "  make drift-check                - Fail CI if metadata drift detected"
+	@echo ""
+	@echo "Dependency Management:"
+	@echo "  make check-dependencies DOMAIN=<name> - Check if required dependencies are running"
+	@echo "  make check-domain-running CHECK_DOMAIN=<name> - Check if a specific domain is running"
+	@echo ""
+	@echo "Vault Management:"
 	@echo "  make vault-create               - Create secrets.env.vault (uses .vault_pass when present)"
 	@echo "  make vault-edit                 - Edit secrets.env.vault"
 	@echo "  make vault-view                 - View secrets.env.vault contents"
+	@echo "  make check-secrets              - Check vault file and password file status"
+	@echo ""
+	@echo "Backup Management:"
+	@echo "  make backup                     - Run full backup (local or cloud based on BACKUP_MODE)"
+	@echo "  make backup-cloud              - Run cloud backup (requires RESTIC_REMOTE)"
+	@echo "  make backup-prune              - Prune old backup snapshots"
+	@echo ""
+	@echo "Status & Utilities:"
+	@echo "  make status                     - Show overall system status"
 
 env:
 	@echo "[Env] Loading environment $(ENV)"
@@ -129,7 +144,62 @@ render-diff:
 		git diff generated/$(DOMAIN) 2>/dev/null || \
 		echo "[Render][Diff][info] No differences detected"
 
-deploy: render
+check-domain-running:
+	@if [ -z "$(CHECK_DOMAIN)" ]; then \
+		echo "[Check][err] CHECK_DOMAIN required (e.g., make check-domain-running CHECK_DOMAIN=postgres)"; \
+		exit 1; \
+	fi
+	@if [ -f "$(ROOT_DIR)/generated/$(CHECK_DOMAIN)/compose.yml" ]; then \
+		cd $(ROOT_DIR) && \
+		RUNNING=$$(docker compose -f generated/$(CHECK_DOMAIN)/compose.yml ps --status running --format json 2>/dev/null | \
+			$(PYTHON) -c "import sys, json; \
+				try: \
+					data = [json.loads(l) for l in sys.stdin if l.strip()]; \
+					running = [c for c in data if c.get('State') == 'running']; \
+					print('yes' if running else 'no'); \
+				except Exception as e: \
+					print('no'); \
+					sys.exit(1)" 2>/dev/null || echo "no"); \
+		if [ "$$RUNNING" = "yes" ]; then \
+			exit 0; \
+		else \
+			exit 1; \
+		fi; \
+	else \
+		exit 1; \
+	fi
+
+check-dependencies:
+	@if [ -f "$(ROOT_DIR)/config-registry/env/domains.yml" ]; then \
+		REQUIRED=$$($(PYTHON) -c "import yaml, sys; \
+			try: \
+				domains = yaml.safe_load(open('$(ROOT_DIR)/config-registry/env/domains.yml'))['domains']; \
+				target = [d for d in domains if d['name'] == '$(DOMAIN)'][0] if any(d['name'] == '$(DOMAIN)' for d in domains) else None; \
+				if target and 'requires' in target and target.get('requires'): \
+					print(' '.join(target['requires'])); \
+			except Exception as e: \
+				pass" 2>/dev/null || echo ""); \
+		if [ -n "$$REQUIRED" ]; then \
+			MISSING=""; \
+			for dep in $$REQUIRED; do \
+				$(MAKE) -s check-domain-running CHECK_DOMAIN=$$dep 2>/dev/null || MISSING="$$MISSING $$dep"; \
+			done; \
+			if [ -n "$$MISSING" ]; then \
+				echo "[Deploy][ERR] Cannot deploy $(DOMAIN): required dependencies are not running:"; \
+				for dep in $$MISSING; do \
+					echo "[Deploy][ERR]   - $$dep (run 'make deploy DOMAIN=$$dep' first)"; \
+				done; \
+				echo "[Deploy][ERR] Use FORCE_DEPLOY=1 to override (not recommended)"; \
+				if [ "$${FORCE_DEPLOY:-}" != "1" ]; then \
+					exit 1; \
+				else \
+					echo "[Deploy][WARN] FORCE_DEPLOY=1 set, proceeding despite missing dependencies..."; \
+				fi; \
+			fi; \
+		fi; \
+	fi
+
+deploy: render check-dependencies
 	@echo "[Deploy] $(DOMAIN)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[Deploy][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && docker compose -f generated/$(DOMAIN)/compose.yml up -d --pull always $(if $(FORCE_RECREATE),--force-recreate)
@@ -139,7 +209,7 @@ deploy: render
 		echo "[Deploy] Alert suppression disabled for $(DOMAIN)"; \
 	fi
 
-deploy-only:
+deploy-only: check-dependencies
 	@echo "[Deploy] $(DOMAIN) (no render)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[Deploy][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && docker compose -f generated/$(DOMAIN)/compose.yml up -d --pull always $(if $(FORCE_RECREATE),--force-recreate)
@@ -149,7 +219,7 @@ deploy-only:
 		echo "[Deploy] Alert suppression disabled for $(DOMAIN)"; \
 	fi
 
-restart:
+restart: check-dependencies
 	@echo "[Restart] $(DOMAIN)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[Restart][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && docker compose -f generated/$(DOMAIN)/compose.yml restart
@@ -252,7 +322,7 @@ down:
 	@cd $(ROOT_DIR) && \
 	CRITICAL_DOMAINS="monitoring postgres forgejo"; \
 	if echo "$$CRITICAL_DOMAINS" | grep -q "^$(DOMAIN)$$" || echo "$$CRITICAL_DOMAINS" | grep -q " $(DOMAIN)$$"; then \
-		echo "[Down][WARN] ⚠️  $(DOMAIN) is a critical service. Bringing it down may affect other services."; \
+		echo "[Down][WARN] $(DOMAIN) is a critical service. Bringing it down may affect other services."; \
 		echo "[Down][WARN] Press Ctrl+C within 5 seconds to cancel..."; \
 		sleep 5; \
 	fi; \
