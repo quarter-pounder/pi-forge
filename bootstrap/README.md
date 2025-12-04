@@ -16,7 +16,7 @@ Re-running normal bootstrap steps will not overwrite user data or damage an exis
 
 ```mermaid
 graph TD
-  subgraph Optional — NVMe preparation
+  subgraph Optional["Optional - NVMe preparation"]
     A[00 - Flash NVMe (fresh image)]
     B[00 - Clone SD → NVMe (live)]
   end
