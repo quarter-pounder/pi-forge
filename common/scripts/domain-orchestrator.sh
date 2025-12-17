@@ -78,6 +78,18 @@ wait_for_domain_healthy() {
         except: pass" 2>/dev/null || echo "")
 
     if [[ -z "$containers" ]]; then
+      local service_names=$(docker compose -f "$compose_file" config --services 2>/dev/null || echo "")
+      for service in $service_names; do
+        local container_name="${domain}-${service}"
+        local alt_name="${service}"
+        if docker ps --format "{{.Names}}" 2>/dev/null | grep -qE "^(${container_name}|${alt_name})$"; then
+          containers="${containers} ${container_name}"
+        fi
+      done
+      containers=$(echo "$containers" | xargs)
+    fi
+
+    if [[ -z "$containers" ]]; then
       attempt=$((attempt + 1))
       sleep 2
       continue
@@ -186,20 +198,22 @@ deploy_domain() {
       done
     fi
 
-    if [[ "$running_count" == "0" ]]; then
-      log_warn "Domain $domain: docker compose reports 0 containers, checking with docker ps directly..."
-      local container_names=$(docker compose -f "$compose_file" config --services 2>/dev/null || echo "")
-      local found_running=0
-      for service in $container_names; do
-        local container_name="${domain}-${service}"
-        if docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^${container_name}$"; then
-          found_running=$((found_running + 1))
+      if [[ "$running_count" == "0" ]]; then
+        log_warn "Domain $domain: docker compose reports 0 containers, checking with docker ps directly..."
+        local container_names=$(docker compose -f "$compose_file" config --services 2>/dev/null || echo "")
+        local found_running=0
+        for service in $container_names; do
+          local container_name="${domain}-${service}"
+          local alt_name="${service}"
+          if docker ps --format "{{.Names}}" 2>/dev/null | grep -qE "^(${container_name}|${alt_name})$"; then
+            found_running=$((found_running + 1))
+            log_info "Domain $domain: Found container '${container_name}' or '${alt_name}' running"
+          fi
+        done
+        if [[ "$found_running" -gt 0 ]]; then
+          log_info "Domain $domain: Found $found_running container(s) running via direct check"
+          return 0
         fi
-      done
-      if [[ "$found_running" -gt 0 ]]; then
-        log_info "Domain $domain: Found $found_running container(s) running via direct check"
-        return 0
-      fi
       log_warn "Domain $domain: No containers running after start"
       log_info "Checking container status and logs..."
       docker compose -f "$compose_file" ps 2>&1 | head -20 | while IFS= read -r line; do
