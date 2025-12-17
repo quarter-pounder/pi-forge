@@ -167,8 +167,23 @@ deploy_domain() {
 
   log_info "Starting containers for $domain using docker compose..."
   local compose_output
-  compose_output=$(docker compose -f "$compose_file" up -d --pull always 2>&1)
+  local pull_flag=""
+
+  if [[ "${PULL_IMAGES_ON_START:-}" == "1" ]]; then
+    pull_flag="--pull always"
+    log_info "Pulling latest images (PULL_IMAGES_ON_START=1)"
+  fi
+
+  compose_output=$(docker compose -f "$compose_file" up -d $pull_flag 2>&1)
   local compose_status=$?
+
+  if [[ $compose_status -ne 0 ]]; then
+    if echo "$compose_output" | grep -qE "unauthorized|access.*denied|rate limit|pull.*access"; then
+      log_warn "Image pull failed (auth/rate limit), trying without pull..."
+      compose_output=$(docker compose -f "$compose_file" up -d 2>&1)
+      compose_status=$?
+    fi
+  fi
 
   if [[ $compose_status -eq 0 ]]; then
     log_info "Domain $domain: docker compose up completed"
