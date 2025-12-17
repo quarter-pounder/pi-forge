@@ -178,6 +178,13 @@ services:
       - run
       - /etc/alloy/config.alloy
       - --server.http.listen-addr=0.0.0.0:12345
+      - --usage-reporting.enabled=false
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
+      - 8.8.8.8
+    environment:
+      - ALLOY_USAGE_REPORTING_ENABLED=false
     networks:
       - monitoring-network
     depends_on:
