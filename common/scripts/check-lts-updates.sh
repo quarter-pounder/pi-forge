@@ -133,8 +133,8 @@ for image_tag in "${IMAGES[@]}"; do
     continue
   fi
 
-  local image_repo="${image_tag%%:*}"
-  local current_tag="${image_tag##*:}"
+ image_repo="${image_tag%%:*}"
+ current_tag="${image_tag##*:}"
 
   if [[ -z "$image_repo" ]] || [[ -z "$current_tag" ]] || [[ "$image_repo" == "$image_tag" ]]; then
     continue
