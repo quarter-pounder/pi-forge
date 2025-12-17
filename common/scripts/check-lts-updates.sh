@@ -19,7 +19,15 @@ if [[ ! -f "$ROOT_DIR/.env" ]]; then
   exit 1
 fi
 
+if [[ -f "$ROOT_DIR/config-registry/env/base.env" ]]; then
+  set -a
+  source "$ROOT_DIR/config-registry/env/base.env" 2>/dev/null || true
+  set +a
+fi
+
+set -a
 source "$ROOT_DIR/.env" 2>/dev/null || true
+set +a
 
 extract_version() {
   local image_tag=$1
@@ -90,20 +98,23 @@ send_email() {
 log_message "Starting LTS update check..."
 
 UPDATES=()
-IMAGES=(
-  "code.forgejo.org/forgejo/forgejo:${FORGEJO_IMAGE##*:}"
-  "code.forgejo.org/forgejo/runner:${FORGEJO_ACTIONS_RUNNER_IMAGE##*:}"
-  "postgres:${POSTGRES_IMAGE##*:}"
-  "prom/prometheus:${PROMETHEUS_IMAGE##*:}"
-  "prom/alertmanager:${ALERTMANAGER_IMAGE##*:}"
-  "grafana/grafana:${GRAFANA_IMAGE##*:}"
-  "grafana/loki:${LOKI_IMAGE##*:}"
-  "grafana/alloy:${ALLOY_IMAGE##*:}"
-  "pihole/pihole:${PIHOLE_IMAGE##*:}"
-  "crazymax/unbound:${UNBOUND_IMAGE##*:}"
-  "woodpeckerci/woodpecker-server:${WOODPECKER_SERVER_IMAGE##*:}"
-  "woodpeckerci/woodpecker-agent:${WOODPECKER_RUNNER_IMAGE##*:}"
-)
+IMAGES=()
+
+IMAGES=()
+set +u
+[ -n "${FORGEJO_IMAGE:-}" ] && IMAGES+=("code.forgejo.org/forgejo/forgejo:${FORGEJO_IMAGE##*:}")
+[ -n "${FORGEJO_ACTIONS_RUNNER_IMAGE:-}" ] && IMAGES+=("code.forgejo.org/forgejo/runner:${FORGEJO_ACTIONS_RUNNER_IMAGE##*:}")
+[ -n "${POSTGRES_IMAGE:-}" ] && IMAGES+=("postgres:${POSTGRES_IMAGE##*:}")
+[ -n "${PROMETHEUS_IMAGE:-}" ] && IMAGES+=("prom/prometheus:${PROMETHEUS_IMAGE##*:}")
+[ -n "${ALERTMANAGER_IMAGE:-}" ] && IMAGES+=("prom/alertmanager:${ALERTMANAGER_IMAGE##*:}")
+[ -n "${GRAFANA_IMAGE:-}" ] && IMAGES+=("grafana/grafana:${GRAFANA_IMAGE##*:}")
+[ -n "${LOKI_IMAGE:-}" ] && IMAGES+=("grafana/loki:${LOKI_IMAGE##*:}")
+[ -n "${ALLOY_IMAGE:-}" ] && IMAGES+=("grafana/alloy:${ALLOY_IMAGE##*:}")
+[ -n "${PIHOLE_IMAGE:-}" ] && IMAGES+=("pihole/pihole:${PIHOLE_IMAGE##*:}")
+[ -n "${UNBOUND_IMAGE:-}" ] && IMAGES+=("crazymax/unbound:${UNBOUND_IMAGE##*:}")
+[ -n "${WOODPECKER_SERVER_IMAGE:-}" ] && IMAGES+=("woodpeckerci/woodpecker-server:${WOODPECKER_SERVER_IMAGE##*:}")
+[ -n "${WOODPECKER_RUNNER_IMAGE:-}" ] && IMAGES+=("woodpeckerci/woodpecker-agent:${WOODPECKER_RUNNER_IMAGE##*:}")
+set -u
 
 for image_tag in "${IMAGES[@]}"; do
   if [[ -z "$image_tag" ]] || [[ "$image_tag" == *":*" ]]; then
