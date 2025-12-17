@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -eo pipefail
 
 ROOT_DIR="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 cd "$ROOT_DIR"
@@ -30,13 +30,21 @@ source "$ROOT_DIR/.env" 2>/dev/null || true
 set +a
 
 extract_version() {
-  local image_tag=$1
+  local image_tag="${1:-}"
+  if [[ -z "$image_tag" ]]; then
+    return 0
+  fi
   echo "$image_tag" | sed -E 's/.*:([0-9]+\.[0-9]+).*/\1/' | head -1
 }
 
 check_image_update() {
-  local image=$1
-  local current_tag=$2
+  local image="${1:-}"
+  local current_tag="${2:-}"
+
+  if [[ -z "$image" ]] || [[ -z "$current_tag" ]]; then
+    return 0
+  fi
+
   local current_version=$(extract_version "$current_tag")
 
   if [[ -z "$current_version" ]]; then
@@ -74,10 +82,14 @@ log_message() {
 }
 
 send_email() {
-  local subject="$1"
-  local body="$2"
+  local subject="${1:-}"
+  local body="${2:-}"
 
-  if [[ -z "$EMAIL_TO" ]] || [[ -z "$SMTP_ADDRESS" ]]; then
+  if [[ -z "$subject" ]] || [[ -z "$body" ]]; then
+    return 0
+  fi
+
+  if [[ -z "${EMAIL_TO:-}" ]] || [[ -z "${SMTP_ADDRESS:-}" ]]; then
     return 0
   fi
 
@@ -117,11 +129,18 @@ set +u
 set -u
 
 for image_tag in "${IMAGES[@]}"; do
-  if [[ -z "$image_tag" ]] || [[ "$image_tag" == *":*" ]]; then
+  if [[ -z "$image_tag" ]] || [[ "$image_tag" == *":*" ]] || [[ "$image_tag" == *":" ]]; then
     continue
   fi
 
-  update=$(check_image_update "$image_tag")
+  local image_repo="${image_tag%%:*}"
+  local current_tag="${image_tag##*:}"
+
+  if [[ -z "$image_repo" ]] || [[ -z "$current_tag" ]] || [[ "$image_repo" == "$image_tag" ]]; then
+    continue
+  fi
+
+  update=$(check_image_update "$image_repo" "$current_tag")
   if [[ -n "$update" ]]; then
     UPDATES+=("$update")
     log_message "Update available: $update"
