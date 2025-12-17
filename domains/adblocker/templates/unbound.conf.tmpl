@@ -73,7 +73,7 @@ server:
     pidfile: "/etc/unbound/unbound.pid"
     trust-anchor-signaling: yes
     module-config: "validator iterator"
-    include: /etc/unbound/unbound.conf.d/*.conf
+    # include: /etc/unbound/unbound.conf.d/*.conf
 
 # Forward queries to upstream DNS servers
 forward-zone:

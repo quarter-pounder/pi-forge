@@ -63,7 +63,7 @@ services:
       - /bin/sh
       - -c
       - |
-        mkdir -p /var/lib/unbound \
+        mkdir -p /var/lib/unbound /etc/unbound/unbound.conf.d \
           && chown -R unbound:unbound /var/lib/unbound \
           && if [ ! -f /var/lib/unbound/root.key ]; then
                su -s /bin/sh unbound -c 'unbound-anchor -a /var/lib/unbound/root.key' || exit 1;
