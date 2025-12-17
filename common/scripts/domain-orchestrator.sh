@@ -159,16 +159,60 @@ deploy_domain() {
   local compose_status=$?
 
   if [[ $compose_status -eq 0 ]]; then
-    log_info "Domain $domain containers started"
-    sleep 3
+    log_info "Domain $domain: docker compose up completed"
+    sleep 5
+
+    local all_containers=$(docker compose -f "$compose_file" ps --format json 2>/dev/null | \
+      python3 -c "import sys, json; \
+        try: \
+          data = [json.loads(l) for l in sys.stdin if l.strip()]; \
+          for c in data: \
+            print(f\"{c.get('Name', 'unknown')}: {c.get('State', 'unknown')}\") \
+        except: pass" 2>/dev/null || echo "")
+
     local running_count=$(docker compose -f "$compose_file" ps --status running --format json 2>/dev/null | \
       python3 -c "import sys, json; \
         try: \
           data = [json.loads(l) for l in sys.stdin if l.strip()]; \
-          print(len([c for c in data if c.get('State') == 'running'])) \
-        except: print('0')" 2>/dev/null || echo "0")
-    log_info "Domain $domain: $running_count container(s) running"
-    return 0
+          running = [c for c in data if c.get('State') == 'running']; \
+          print(len(running)) \
+        except Exception as e: \
+          print('0')" 2>/dev/null || echo "0")
+
+    if [[ -n "$all_containers" ]]; then
+      log_info "Domain $domain container status:"
+      echo "$all_containers" | while IFS= read -r line; do
+        log_info "  $line"
+      done
+    fi
+
+    if [[ "$running_count" == "0" ]]; then
+      log_warn "Domain $domain: docker compose reports 0 containers, checking with docker ps directly..."
+      local container_names=$(docker compose -f "$compose_file" config --services 2>/dev/null || echo "")
+      local found_running=0
+      for service in $container_names; do
+        local container_name="${domain}-${service}"
+        if docker ps --format "{{.Names}}" 2>/dev/null | grep -q "^${container_name}$"; then
+          found_running=$((found_running + 1))
+        fi
+      done
+      if [[ "$found_running" -gt 0 ]]; then
+        log_info "Domain $domain: Found $found_running container(s) running via direct check"
+        return 0
+      fi
+      log_warn "Domain $domain: No containers running after start"
+      log_info "Checking container status and logs..."
+      docker compose -f "$compose_file" ps 2>&1 | head -20 | while IFS= read -r line; do
+        log_info "  $line"
+      done
+      docker compose -f "$compose_file" logs --tail=10 2>&1 | head -20 | while IFS= read -r line; do
+        log_info "  $line"
+      done
+      return 1
+    else
+      log_info "Domain $domain: $running_count container(s) running"
+      return 0
+    fi
   else
     log_error "Failed to start $domain"
     log_error "Docker compose error: ${compose_output:0:500}"
@@ -221,6 +265,7 @@ start_domain_recursive() {
       start_domain_recursive "$dep"
       if ! wait_for_domain_healthy "$dep"; then
         log_error "Critical dependency $dep failed to become healthy, aborting $domain"
+        log_info "Check dependency status with: docker compose -f $ROOT_DIR/generated/$dep/compose.yml ps"
         return 1
       fi
     fi
