@@ -190,7 +190,10 @@ stop_domain() {
 }
 
 declare -A CRITICAL_DEPS=(
+  ["adblocker"]=""
   ["postgres"]=""
+  ["monitoring"]=""
+  ["tunnel"]=""
   ["forgejo"]="postgres"
   ["woodpecker"]="postgres forgejo"
   ["woodpecker-runner"]="woodpecker forgejo"
@@ -226,7 +229,10 @@ start_domain_recursive() {
   if deploy_domain "$domain"; then
     STARTED[$domain]=1
     wait_for_domain_healthy "$domain" || {
-      if [[ -n "$deps" ]]; then
+      if [[ "$domain" == "adblocker" ]]; then
+        log_warn "Adblocker failed to become healthy - DNS fallback will be used"
+        log_info "System will continue with fallback DNS (1.1.1.1, 8.8.8.8)"
+      elif [[ -n "$deps" ]]; then
         log_error "Critical domain $domain failed to become healthy"
         return 1
       else
@@ -234,7 +240,11 @@ start_domain_recursive() {
       fi
     }
   else
-    if [[ -n "$deps" ]]; then
+    if [[ "$domain" == "adblocker" ]]; then
+      log_warn "Adblocker failed to start - DNS fallback will be used"
+      log_info "System will continue with fallback DNS (1.1.1.1, 8.8.8.8)"
+      STARTED[$domain]=1
+    elif [[ -n "$deps" ]]; then
       log_error "Failed to start $domain (has critical dependencies)"
       return 1
     else
@@ -249,7 +259,8 @@ if [[ "$ACTION" == "start" ]]; then
 
   local found_domains=0
   local skipped_domains=0
-  for domain in postgres monitoring tunnel adblocker forgejo registry woodpecker forgejo-actions-runner woodpecker-runner github-actions-runner; do
+  # Start adblocker first (critical for DNS), then postgres, then others
+  for domain in adblocker postgres monitoring tunnel forgejo registry woodpecker forgejo-actions-runner woodpecker-runner github-actions-runner; do
     if [[ -f "$ROOT_DIR/generated/$domain/compose.yml" ]]; then
       found_domains=$((found_domains + 1))
       start_domain_recursive "$domain"

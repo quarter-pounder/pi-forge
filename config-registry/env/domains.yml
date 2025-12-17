@@ -73,10 +73,9 @@ domains:
 
   - name: adblocker
     description: Pi-hole + Unbound DNS filtering
-    placement: tunnel
-    standalone: false
-    requires:
-      - tunnel
+    placement: local
+    standalone: true
+    requires: []
     exposes_to:
       - tunnel
     consumes: []

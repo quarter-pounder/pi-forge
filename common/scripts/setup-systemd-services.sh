@@ -37,6 +37,12 @@ fi
 
 chmod +x "$REPO_DIR/common/scripts/domain-orchestrator.sh"
 chmod +x "$REPO_DIR/common/scripts/check-lts-updates.sh" 2>/dev/null || true
+chmod +x "$REPO_DIR/common/scripts/configure-dns-fallback.sh" 2>/dev/null || true
+
+log_info "Configuring DNS fallback (resilience against adblocker failures)..."
+if [[ -f "$REPO_DIR/common/scripts/configure-dns-fallback.sh" ]]; then
+  bash "$REPO_DIR/common/scripts/configure-dns-fallback.sh" || log_warn "DNS fallback configuration failed (may need manual setup)"
+fi
 
 log_info "Creating domain orchestration service..."
 
