@@ -2,7 +2,7 @@ services:
   registry:
     image: {{ REGISTRY_IMAGE }}
     container_name: forgejo-registry
-    restart: always
+    restart: unless-stopped
     ports:
       - "{{ PORT_REGISTRY_HTTP }}:5000"
     environment:
