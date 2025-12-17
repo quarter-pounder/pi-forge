@@ -146,25 +146,32 @@ deploy_domain() {
   local compose_file="$ROOT_DIR/generated/$domain/compose.yml"
 
   if [[ ! -f "$compose_file" ]]; then
-    log_warn "Compose file not found for $domain, skipping"
-    return 0
+    log_warn "Compose file not found for $domain (run 'make render DOMAIN=$domain' first), skipping"
+    return 1
   fi
 
   log_info "Starting domain: $domain"
   cd "$ROOT_DIR"
 
-  if [[ -f "$ROOT_DIR/common/Makefile" ]]; then
-    if make deploy-only DOMAIN="$domain" >/dev/null 2>&1; then
-      return 0
-    else
-      log_warn "Makefile deploy failed for $domain, trying direct compose"
-    fi
-  fi
+  log_info "Starting containers for $domain using docker compose..."
+  local compose_output
+  compose_output=$(docker compose -f "$compose_file" up -d --pull always 2>&1)
+  local compose_status=$?
 
-  if docker compose -f "$compose_file" up -d --pull always >/dev/null 2>&1; then
+  if [[ $compose_status -eq 0 ]]; then
+    log_info "Domain $domain containers started"
+    sleep 3
+    local running_count=$(docker compose -f "$compose_file" ps --status running --format json 2>/dev/null | \
+      python3 -c "import sys, json; \
+        try: \
+          data = [json.loads(l) for l in sys.stdin if l.strip()]; \
+          print(len([c for c in data if c.get('State') == 'running'])) \
+        except: print('0')" 2>/dev/null || echo "0")
+    log_info "Domain $domain: $running_count container(s) running"
     return 0
   else
-    log_warn "Failed to start $domain"
+    log_error "Failed to start $domain"
+    log_error "Docker compose error: ${compose_output:0:500}"
     return 1
   fi
 }
@@ -218,9 +225,14 @@ start_domain_recursive() {
 
   if deploy_domain "$domain"; then
     STARTED[$domain]=1
-    if [[ -n "$deps" ]]; then
-      wait_for_domain_healthy "$domain" || true
-    fi
+    wait_for_domain_healthy "$domain" || {
+      if [[ -n "$deps" ]]; then
+        log_error "Critical domain $domain failed to become healthy"
+        return 1
+      else
+        log_warn "Domain $domain started but not fully healthy (non-critical, continuing)"
+      fi
+    }
   else
     if [[ -n "$deps" ]]; then
       log_error "Failed to start $domain (has critical dependencies)"
@@ -235,11 +247,23 @@ if [[ "$ACTION" == "start" ]]; then
   log_info "Starting domain orchestration..."
   wait_for_docker
 
+  local found_domains=0
+  local skipped_domains=0
   for domain in postgres monitoring tunnel adblocker forgejo registry woodpecker forgejo-actions-runner woodpecker-runner github-actions-runner; do
     if [[ -f "$ROOT_DIR/generated/$domain/compose.yml" ]]; then
+      found_domains=$((found_domains + 1))
       start_domain_recursive "$domain"
+    else
+      skipped_domains=$((skipped_domains + 1))
+      log_info "Domain $domain not rendered (compose.yml not found), skipping"
     fi
   done
+
+  if [[ $found_domains -eq 0 ]]; then
+    log_warn "No domains found to start. Render domains first with: make render DOMAIN=<name>"
+  elif [[ $skipped_domains -gt 0 ]]; then
+    log_info "Skipped $skipped_domains domain(s) (not rendered), started $found_domains domain(s)"
+  fi
 
   log_success "Domain orchestration complete"
 else
