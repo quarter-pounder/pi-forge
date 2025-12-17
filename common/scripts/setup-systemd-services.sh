@@ -16,7 +16,19 @@ SERVICE_NAME="pi-forge-domains.service"
 UPDATE_SERVICE="pi-forge-update.service"
 UPDATE_TIMER="pi-forge-update.timer"
 
-log_info "Setting up Pi Forge systemd services..."
+if [[ -f "$REPO_DIR/.env" ]]; then
+  set -a
+  source "$REPO_DIR/.env" 2>/dev/null || true
+  set +a
+fi
+
+SERVICE_USER="${USERNAME:-${SUDO_USER:-$USER}}"
+if [[ -z "$SERVICE_USER" ]] || [[ "$SERVICE_USER" == "root" ]]; then
+  log_error "Could not determine service user. Set USERNAME in .env or run as non-root user with sudo."
+  exit 1
+fi
+
+log_info "Setting up Pi Forge systemd services (user: $SERVICE_USER)..."
 
 if [[ ! -f "$REPO_DIR/common/scripts/domain-orchestrator.sh" ]]; then
   log_error "domain-orchestrator.sh not found"
@@ -39,7 +51,7 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-User=pi
+User=$SERVICE_USER
 Group=docker
 WorkingDirectory=$REPO_DIR
 Environment="ROOT_DIR=$REPO_DIR"
@@ -68,7 +80,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-User=pi
+User=$SERVICE_USER
 Group=docker
 WorkingDirectory=$REPO_DIR
 Environment="ROOT_DIR=$REPO_DIR"
