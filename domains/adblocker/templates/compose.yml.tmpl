@@ -33,12 +33,14 @@ services:
     cap_add:
       - NET_ADMIN
     dns:
-      - 127.0.0.11
+      - {{ ADBLOCKER_UNBOUND_IP }}
       - 1.1.1.1
+      - 8.8.8.8
     networks:
       - adblocker-network
     depends_on:
-      - unbound
+      unbound:
+        condition: service_healthy
 
   unbound:
     image: {{ UNBOUND_IMAGE }}
