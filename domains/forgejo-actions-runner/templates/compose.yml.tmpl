@@ -25,6 +25,12 @@ services:
           echo ""
           echo "NOTE: Use Node.js images (node:20-bookworm, node:20-bullseye) for GitHub Actions compatibility"
           echo "The .runner file will be created in /data and persist across restarts."
+          echo ""
+          echo "NETWORK CONFIGURATION:"
+          echo "When registering, ensure spawned action containers can reach Forgejo."
+          echo "The runner is on forgejo-network. Spawned containers should use:"
+          echo "  - Network mode: Use 'forgejo-network' or configure runner to join network"
+          echo "  - Forgejo URL: Use 'http://forgejo:3000' for internal communication"
           echo "Waiting for manual registration (checking every 10 seconds)..."
           while [ ! -f /data/.runner ]; do
             sleep 10
