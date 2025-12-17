@@ -257,8 +257,8 @@ if [[ "$ACTION" == "start" ]]; then
   log_info "Starting domain orchestration..."
   wait_for_docker
 
-  local found_domains=0
-  local skipped_domains=0
+  found_domains=0
+  skipped_domains=0
   # Start adblocker first (critical for DNS), then postgres, then others
   for domain in adblocker postgres monitoring tunnel forgejo registry woodpecker forgejo-actions-runner woodpecker-runner github-actions-runner; do
     if [[ -f "$ROOT_DIR/generated/$domain/compose.yml" ]]; then
