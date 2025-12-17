@@ -49,11 +49,11 @@ services:
       - "{{ PORT_ADBLOCKER_UNBOUND }}:53/tcp"
       - "{{ PORT_ADBLOCKER_UNBOUND }}:53/udp"
     healthcheck:
-      test: ["CMD-SHELL", "drill -Q @127.0.0.1 cloudflare.com A || dig +time=2 +tries=1 @127.0.0.1 cloudflare.com || exit 1"]
-      interval: 1m
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 53 || (pgrep -f 'unbound -d' > /dev/null && exit 0) || exit 1"]
+      interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 45s
     volumes:
       - ./unbound.conf:/etc/unbound/unbound.conf:ro
       - /srv/adblocker/unbound:/var/lib/unbound
