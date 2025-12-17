@@ -39,22 +39,29 @@ get_container_state() {
 
 is_container_healthy() {
   local container_name=$1
+  local state=$(get_container_state "$container_name")
+
+  if [[ "$state" != "running" ]]; then
+    return 1
+  fi
+
   local health=$(docker inspect --format '{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "none")
+
   if [[ "$health" == "healthy" ]]; then
     return 0
   elif [[ "$health" == "none" ]]; then
-    local state=$(get_container_state "$container_name")
-    if [[ "$state" == "running" ]]; then
-      return 0
-    fi
+    return 0
+  elif [[ "$health" == "starting" ]]; then
+    return 1
   fi
+
   return 1
 }
 
 wait_for_domain_healthy() {
   local domain=$1
   local compose_file="$ROOT_DIR/generated/$domain/compose.yml"
-  local max_attempts=60
+  local max_attempts=90
   local attempt=0
 
   if [[ ! -f "$compose_file" ]]; then
@@ -64,28 +71,42 @@ wait_for_domain_healthy() {
   while [[ $attempt -lt $max_attempts ]]; do
     local containers=$(docker compose -f "$compose_file" ps --format json 2>/dev/null | \
       python3 -c "import sys, json; \
-        data = [json.loads(l) for l in sys.stdin if l.strip()]; \
-        containers = [c['Name'] for c in data if c.get('State') == 'running']; \
-        print(' '.join(containers))" 2>/dev/null || echo "")
+        try: \
+          data = [json.loads(l) for l in sys.stdin if l.strip()]; \
+          containers = [c['Name'] for c in data if c.get('State') == 'running']; \
+          print(' '.join(containers)) \
+        except: pass" 2>/dev/null || echo "")
 
-    if [[ -n "$containers" ]]; then
-      local all_healthy=true
-      for container in $containers; do
-        if ! is_container_healthy "$container"; then
-          all_healthy=false
-          break
-        fi
-      done
-      if [[ "$all_healthy" == "true" ]]; then
-        log_success "Domain $domain is healthy"
-        return 0
-      fi
+    if [[ -z "$containers" ]]; then
+      attempt=$((attempt + 1))
+      sleep 2
+      continue
     fi
+
+    local all_healthy=true
+    local unhealthy_count=0
+    for container in $containers; do
+      if ! is_container_healthy "$container"; then
+        all_healthy=false
+        unhealthy_count=$((unhealthy_count + 1))
+      fi
+    done
+
+    if [[ "$all_healthy" == "true" ]]; then
+      log_success "Domain $domain is healthy"
+      return 0
+    fi
+
+    if [[ $((attempt % 15)) -eq 0 ]] && [[ $attempt -gt 0 ]]; then
+      log_info "Domain $domain: $unhealthy_count container(s) not yet healthy (attempt $attempt/$max_attempts)"
+    fi
+
     attempt=$((attempt + 1))
     sleep 2
   done
 
-  log_warn "Domain $domain not healthy after $max_attempts attempts"
+  local running_count=$(echo "$containers" | wc -w)
+  log_warn "Domain $domain not fully healthy after $max_attempts attempts ($running_count container(s) running)"
   return 1
 }
 
