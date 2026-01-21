@@ -548,12 +548,12 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "max_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0)[1m]) * 100",
+          "expr": "max_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_service=\"unbound\"}) > 0)[1m]) * 100",
           "refId": "A",
           "legendFormat": "Current Status"
         },
         {
-          "expr": "clamp_max(avg_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0)[6h:1m]) * 100, 100)",
+          "expr": "clamp_max(avg_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_service=\"unbound\"}) > 0)[6h:1m]) * 100, 100)",
           "refId": "B",
           "legendFormat": "6h Availability",
           "hide": true
