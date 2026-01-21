@@ -28,7 +28,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(1 - clamp_max(max_over_time(up{job=~\"forgejo|prometheus|loki|pihole\"}[5m]), 1))",
+          "expr": "sum(1 - clamp_max(max_over_time(up{job=~\"forgejo|prometheus|loki\"}[5m]), 1))",
           "refId": "A"
         }
       ],
@@ -542,20 +542,20 @@
     },
     {
       "type": "stat",
-      "title": "Unbound Container (6h)",
+      "title": "Unbound Container",
       "id": 202,
       "gridPos": { "h": 4, "w": 6, "x": 6, "y": 37 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "clamp_max(avg_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0)[6h:1m]) * 100, 100)",
+          "expr": "max_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0)[1m]) * 100",
           "refId": "A",
-          "legendFormat": "6h Availability"
+          "legendFormat": "Current Status"
         },
         {
-          "expr": "max((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0) * 1)",
+          "expr": "clamp_max(avg_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0)[6h:1m]) * 100, 100)",
           "refId": "B",
-          "legendFormat": "Status",
+          "legendFormat": "6h Availability",
           "hide": true
         }
       ],
