@@ -173,7 +173,7 @@ groups:
         {% endraw %}
 
       - alert: UnboundDown
-        expr: count(container_cpu_usage_seconds_total{job="cadvisor",container_label_com_docker_compose_service="unbound"}) == 0
+        expr: count(container_cpu_usage_seconds_total{job="cadvisor",name=~"adblocker-unbound|unbound"}) == 0
         for: 2m
         labels:
           severity: warning
