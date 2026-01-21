@@ -172,6 +172,15 @@ groups:
           description: "Container has been down for more than 2 minutes"
         {% endraw %}
 
+      - alert: UnboundDown
+        expr: count(container_cpu_usage_seconds_total{job="cadvisor",name=~"adblocker-unbound|unbound"}) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unbound DNS resolver is down"
+          description: "Unbound container has been down for more than 2 minutes. DNS resolution may be affected."
+
       - alert: RunnerSuppressionActive
         expr: |
           label_replace(
