@@ -548,7 +548,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "max_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0)[1m]) * 100",
+          "expr": "(count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0) * 100",
           "refId": "A",
           "legendFormat": "Current Status"
         },
