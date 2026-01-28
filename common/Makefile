@@ -3,7 +3,7 @@ SHELL := /bin/bash
 .SILENT:
 .DEFAULT_GOAL := help
 
-.PHONY: help env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest vault-create vault-edit vault-view check-secrets status check-dependencies check-domain-running
+.PHONY: help env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest vault-create vault-edit vault-view check-secrets status check-dependencies check-domain-running update update-all update-check
 
 ENV ?= dev
 DOMAIN ?= forgejo
@@ -43,6 +43,9 @@ help:
 	@echo "  make render-all                - Render all domains"
 	@echo "  make deploy-all                - Deploy all domains"
 	@echo "  make list-domains              - List available domains"
+	@echo "  make update-check DOMAIN=<name> - Check for available updates (all domains if not specified)"
+	@echo "  make update DOMAIN=<name>       - Apply updates for a specific domain"
+	@echo "  make update-all                - Apply updates for all domains"
 	@echo "  make down DOMAIN=<name>        - Bring domain down (with warnings and dependency checks)"
 	@echo "  make destroy DOMAIN=<name>      - Destroy domain"
 	@echo "  make manifest                   - Generate manifest"
@@ -315,6 +318,21 @@ deploy-all:
 			fi; \
 		done
 	@echo "[Deploy][All] Completed"
+
+UPDATE_SCRIPT := $(ROOT_DIR)/common/scripts/update-domains.sh
+
+update-check:
+	@bash $(UPDATE_SCRIPT) check $(if $(DOMAIN),$(DOMAIN),)
+
+update:
+	@if [ -z "$(DOMAIN)" ]; then \
+		echo "[Update][err] DOMAIN required (e.g., make update DOMAIN=forgejo)"; \
+		exit 1; \
+	fi
+	@bash $(UPDATE_SCRIPT) apply $(DOMAIN)
+
+update-all:
+	@bash $(UPDATE_SCRIPT) apply-all
 
 down:
 	@echo "[Down] $(DOMAIN)"
