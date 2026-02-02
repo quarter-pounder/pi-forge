@@ -73,6 +73,9 @@ services:
       - "{{ PORT_FORGEJO_SSH }}:22"
     volumes:
       - /srv/forgejo/data:/data
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     networks:
       - forgejo-network
 
