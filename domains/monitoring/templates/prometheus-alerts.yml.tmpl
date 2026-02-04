@@ -173,7 +173,7 @@ groups:
         {% endraw %}
 
       - alert: UnboundDown
-        expr: (count(container_cpu_usage_seconds_total{job="cadvisor",name=~".*unbound.*"}) or count(container_cpu_usage_seconds_total{job="cadvisor",container_label_com_docker_compose_service="unbound"}) or count(container_name_info{job="node-exporter",container_name=~".*unbound.*"}) or vector(0)) == 0
+        expr: max((count(container_cpu_usage_seconds_total{job="cadvisor",name=~".*unbound.*"}) or count(container_cpu_usage_seconds_total{job="cadvisor",container_label_com_docker_compose_service="unbound"}) or count(container_name_info{job="node-exporter",container_name=~".*unbound.*"})) > 0) or vector(0) == 0
         for: 2m
         labels:
           severity: warning
