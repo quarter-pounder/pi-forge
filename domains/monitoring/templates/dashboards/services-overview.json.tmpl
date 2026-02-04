@@ -496,7 +496,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "(count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-pihole|pihole\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_project=\"adblocker\",container_label_com_docker_compose_service=\"pihole\"})) > 0",
+          "expr": "((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-pihole|pihole\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_project=\"adblocker\",container_label_com_docker_compose_service=\"pihole\"})) > 0) or vector(0)",
           "refId": "A",
           "legendFormat": "Status"
         }
@@ -548,7 +548,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "(count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\".*unbound.*\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_service=\"unbound\"}) or count(container_name_info{job=\"node-exporter\",container_name=~\".*unbound.*\"})) > 0",
+          "expr": "((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\".*unbound.*\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_service=\"unbound\"}) or count(container_name_info{job=\"node-exporter\",container_name=~\".*unbound.*\"})) > 0) or vector(0)",
           "refId": "A",
           "legendFormat": "Status"
         }
