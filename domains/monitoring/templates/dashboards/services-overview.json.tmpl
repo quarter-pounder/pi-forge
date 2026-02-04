@@ -496,32 +496,36 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "clamp_max(avg_over_time(((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-pihole|pihole\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_project=\"adblocker\",container_label_com_docker_compose_service=\"pihole\"})) > 0)[6h:1m]) * 100, 100)",
+          "expr": "(count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-pihole|pihole\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_project=\"adblocker\",container_label_com_docker_compose_service=\"pihole\"})) > 0",
           "refId": "A",
-          "legendFormat": "6h Availability"
+          "legendFormat": "Status"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "min": 0,
-          "max": 100,
+          "unit": "none",
+          "decimals": 0,
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "#d66060", "value": null },
-              { "color": "#e0b252", "value": 99 },
-              { "color": "#5fb3b3", "value": 100 }
+              { "color": "#5fb3b3", "value": 1 }
             ]
           },
           "mappings": [
             {
+              "type": "value",
+              "options": {
+                "0": { "text": "Down", "color": "#d66060" },
+                "1": { "text": "Up", "color": "#5fb3b3" }
+              }
+            },
+            {
               "type": "special",
               "options": {
                 "match": "nan",
-                "result": { "text": "No data", "color": "#a5a5a5" }
+                "result": { "text": "Unknown", "color": "#a5a5a5" }
               }
             }
           ]
@@ -544,32 +548,36 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "clamp_max(avg_over_time(((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\".*unbound.*\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_service=\"unbound\"})) > 0)[6h:1m]) * 100, 100)",
+          "expr": "(count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\".*unbound.*\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_service=\"unbound\"}) or count(container_name_info{job=\"node-exporter\",container_name=~\".*unbound.*\"})) > 0",
           "refId": "A",
-          "legendFormat": "6h Availability"
+          "legendFormat": "Status"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "percent",
-          "decimals": 1,
-          "min": 0,
-          "max": 100,
+          "unit": "none",
+          "decimals": 0,
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
             "steps": [
               { "color": "#d66060", "value": null },
-              { "color": "#e0b252", "value": 99 },
-              { "color": "#5fb3b3", "value": 100 }
+              { "color": "#5fb3b3", "value": 1 }
             ]
           },
           "mappings": [
             {
+              "type": "value",
+              "options": {
+                "0": { "text": "Down", "color": "#d66060" },
+                "1": { "text": "Up", "color": "#5fb3b3" }
+              }
+            },
+            {
               "type": "special",
               "options": {
                 "match": "nan",
-                "result": { "text": "No data", "color": "#a5a5a5" }
+                "result": { "text": "Unknown", "color": "#a5a5a5" }
               }
             }
           ]
