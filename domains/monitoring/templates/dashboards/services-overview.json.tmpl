@@ -496,15 +496,14 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-pihole|pihole\"}) > 0",
+          "expr": "(count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-pihole|pihole\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_project=\"adblocker\",container_label_com_docker_compose_service=\"pihole\"})) > 0",
           "refId": "A",
           "legendFormat": "Status"
         },
         {
-          "expr": "clamp_max(avg_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-pihole|pihole\"}) > 0)[6h:1m]) * 100, 100)",
+          "expr": "clamp_max(avg_over_time(((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-pihole|pihole\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_project=\"adblocker\",container_label_com_docker_compose_service=\"pihole\"})) > 0)[6h:1m]) * 100, 100)",
           "refId": "B",
-          "legendFormat": "6h Availability",
-          "hide": true
+          "legendFormat": "6h Availability"
         }
       ],
       "fieldConfig": {
@@ -542,7 +541,29 @@
             }
           ]
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "6h Availability" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "decimals", "value": 1 },
+              { "id": "min", "value": 0 },
+              { "id": "max", "value": 100 },
+              { "id": "mappings", "value": [] },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "#d66060", "value": null },
+                    { "color": "#e0b252", "value": 99 },
+                    { "color": "#5fb3b3", "value": 100 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "orientation": "horizontal",
@@ -560,15 +581,14 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0",
+          "expr": "(count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_project=\"adblocker\",container_label_com_docker_compose_service=\"unbound\"})) > 0",
           "refId": "A",
           "legendFormat": "Status"
         },
         {
-          "expr": "clamp_max(avg_over_time((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) > 0)[6h:1m]) * 100, 100)",
+          "expr": "clamp_max(avg_over_time(((count(container_cpu_usage_seconds_total{job=\"cadvisor\",name=~\"adblocker-unbound|unbound\"}) or count(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_project=\"adblocker\",container_label_com_docker_compose_service=\"unbound\"})) > 0)[6h:1m]) * 100, 100)",
           "refId": "B",
-          "legendFormat": "6h Availability",
-          "hide": true
+          "legendFormat": "6h Availability"
         }
       ],
       "fieldConfig": {
@@ -606,7 +626,29 @@
             }
           ]
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "6h Availability" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "decimals", "value": 1 },
+              { "id": "min", "value": 0 },
+              { "id": "max", "value": 100 },
+              { "id": "mappings", "value": [] },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "#d66060", "value": null },
+                    { "color": "#e0b252", "value": 99 },
+                    { "color": "#5fb3b3", "value": 100 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "orientation": "horizontal",
