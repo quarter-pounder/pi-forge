@@ -51,7 +51,30 @@ fi
 log_info "Restarting systemd-resolved..."
 systemctl restart systemd-resolved
 
+RESOLV_CONF="/etc/resolv.conf"
+RESOLVED_RESOLV="/run/systemd/resolve/resolv.conf"
+if [[ -L "$RESOLV_CONF" ]]; then
+  TARGET=$(readlink "$RESOLV_CONF")
+  if [[ "$TARGET" == *stub-resolv.conf* ]]; then
+    log_info "Pointing /etc/resolv.conf to resolved upstream list (not stub)..."
+    ln -sfn "$RESOLVED_RESOLV" "$RESOLV_CONF"
+    log_success "Updated resolv.conf symlink"
+  fi
+fi
+
+if [[ -f "$RESOLV_CONF" ]]; then
+  if grep -q "127.0.0.53\|127.0.0.1\|::1" "$RESOLV_CONF" 2>/dev/null && ! grep -q "1.1.1.1\|8.8.8.8" "$RESOLV_CONF" 2>/dev/null; then
+    log_warn "resolv.conf still points to localhost; writing static fallback nameservers"
+    echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8" > "$RESOLV_CONF"
+    log_success "Wrote fallback nameservers to $RESOLV_CONF"
+  fi
+elif [[ ! -e "$RESOLV_CONF" ]]; then
+  log_warn "No $RESOLV_CONF; creating with fallback nameservers"
+  echo -e "nameserver 1.1.1.1\nnameserver 8.8.8.8" > "$RESOLV_CONF"
+  log_success "Created $RESOLV_CONF"
+fi
+
 log_success "DNS fallback configured"
 log_info "Fallback DNS servers: 1.1.1.1, 8.8.8.8, 1.0.0.1"
-log_info "These will be used if adblocker (127.0.0.1:53) is unavailable"
+log_info "Host will resolve via these when adblocker (port 53) is down or starting"
 
