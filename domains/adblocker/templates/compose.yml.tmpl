@@ -10,7 +10,7 @@ services:
     environment:
       TZ: {{ TIMEZONE if TIMEZONE else 'UTC' }}
       WEBPASSWORD: {{ PIHOLE_WEB_PASSWORD }}
-      DNS1: "{{ ADBLOCKER_UNBOUND_IP }}#53"
+      DNS1: "unbound#53"
       DNS2: "1.1.1.1"
       DNSSEC: "true"
       DNS_BOGUS_PRIV: "true"
@@ -18,7 +18,7 @@ services:
       INTERFACE: eth0
       VIRTUAL_HOST: {{ 'pihole.' ~ DOMAIN if DOMAIN else 'pihole.local' }}
       VIRTUAL_PORT: "80"
-      PIHOLE_DNS_: "{{ ADBLOCKER_UNBOUND_IP }}#53;1.1.1.1;1.0.0.1"
+      PIHOLE_DNS_: "unbound#53;1.1.1.1;1.0.0.1"
       PIHOLE_DOMAIN: {{ DOMAIN if DOMAIN else 'local' }}
       FTLCONF_LOCAL_IPV4: {{ PIHOLE_LOCAL_IPV4 if PIHOLE_LOCAL_IPV4 else '192.168.1.100' }}
     volumes:
@@ -33,7 +33,7 @@ services:
     cap_add:
       - NET_ADMIN
     dns:
-      - {{ ADBLOCKER_UNBOUND_IP }}
+      - unbound
       - 1.1.1.1
       - 8.8.8.8
     networks:
@@ -70,8 +70,7 @@ services:
              fi \
           && exec su -s /bin/sh unbound -c 'unbound -d -v'
     networks:
-      adblocker-network:
-        ipv4_address: {{ ADBLOCKER_UNBOUND_IP }}
+      - adblocker-network
 
 networks:
   adblocker-network:
