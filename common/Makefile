@@ -3,7 +3,7 @@ SHELL := /bin/bash
 .SILENT:
 .DEFAULT_GOAL := help
 
-.PHONY: help env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest vault-create vault-edit vault-view check-secrets status check-dependencies check-domain-running update update-all update-check
+.PHONY: help env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest vault-create vault-edit vault-view check-secrets status check-dependencies check-domain-running update update-all update-check dns-fix
 
 ENV ?= dev
 DOMAIN ?= forgejo
@@ -76,6 +76,7 @@ help:
 	@echo ""
 	@echo "Status & Utilities:"
 	@echo "  make status                     - Show overall system status"
+	@echo "  make dns-fix                    - Run DNS fallback one-time fix (requires sudo)"
 
 env:
 	@echo "[Env] Loading environment $(ENV)"
@@ -449,6 +450,13 @@ status:
 	@$(MAKE) -s check-secrets || true
 	@echo "[Status] Rendered domains:"
 	@ls -1 $(ROOT_DIR)/generated 2>/dev/null || echo "(none)"
+
+DNS_FIX_SCRIPT := $(ROOT_DIR)/common/scripts/configure-dns-fallback.sh
+
+dns-fix:
+	@echo "[DNS Fix] Configuring host DNS fallback (systemd-resolved, resolv.conf)..."
+	@[ -f "$(DNS_FIX_SCRIPT)" ] || { echo "[DNS Fix][err] Script not found: $(DNS_FIX_SCRIPT)"; exit 1; }
+	@cd $(ROOT_DIR) && sudo bash "$(DNS_FIX_SCRIPT)"
 
 .PHONY: add-github-runner github-runner-down destroy-github-runner list-github-runners render-github-runner deploy-github-runner
 GITHUB_RUNNER_MANAGER := $(ROOT_DIR)/common/scripts/github-runner-manager.sh
