@@ -8,7 +8,7 @@ Licensing, enterprise OS, oversized instance flavors, storage premiums—layers 
 
 So I decided to tame the beast on my own Raspberry Pi because... Why not? I happen to use CI anyway.
 
-In case you're wondering, yes, it can pull it off. You can check the `legacy` branch if you're curious about the old setup scripts. I moved on from it because it could no longer handle the complexity as I added new stuff.
+In case you're wondering, yes, it can pull it off. You can check the `legacy` branch if you're curious about the old setup scripts. I moved on from it because it can no longer handle the complexity as I add new stuff.
 
 After enough iterations, frustrations, and rebuilds, this stack grew into what it is now: a domain-driven home server architecture that actually behaves.
 
@@ -20,9 +20,9 @@ After enough iterations, frustrations, and rebuilds, this stack grew into what i
 
 At some point the heavy Omnibus stack turned into a swamp.
 
-Puma, the application server, demanded tuning that assumes x86. Gitaly running like a separate microservice sluster. Is GitLab CE's internal nginx bindind the port anoter service trying to use? Did they change the config convention about exposing metrics to external monitoring? All of it glued together inside the Omnibus package with expectations designed for a VM with multiple vCPUs, definitely not for a single node setup.
+Puma, the application server, demanded tuning that assumes x86. Gitaly running like a separate microservice cluster. Is GitLab CE's internal nginx bindind the port anoter service trying to use? Did they change the config convention about exposing metrics to external monitoring? All of it glued together inside the Omnibus package with expectations designed for a VM with multiple vCPUs, definitely not for a single node setup.
 
-Fumbling knee-deep in Puma configs, Sidekiq queue tuning guides, I swapped to Forgejo because it makes sense. It's a Gitea fork. Lightweight, fast, sane defaults... And you can swap between Forgejo Actions and GitHub Actions with minimal effects.
+Fumbling knee-deep in Puma configs, Sidekiq queue tuning guides, I swapped to Forgejo because it makes sense. It's a Gitea fork. Lightweight, fast, sane defaults... And you can swap between Forgejo Actions and GitHub Actions with minimal efforts.
 
 ---
 
