@@ -36,12 +36,6 @@ local.file_match "docker_logs" {
   ]
 }
 
-// ---------- DISCOVERY --------------------------------------------------------
-
-discovery.docker "containers" {
-  host = "unix:///var/run/docker.sock"
-}
-
 // ---------- SOURCE: SYSTEM ---------------------------------------------------
 
 loki.source.file "system" {
@@ -60,14 +54,6 @@ loki.source.file "forgejo" {
 
 loki.source.file "docker_file" {
   targets    = local.file_match.docker_logs.targets
-  forward_to = [loki.process.docker.receiver]
-}
-
-// ---------- SOURCE: DOCKER API ----------------------------------------------
-
-loki.source.docker "containers" {
-  host       = "unix:///var/run/docker.sock"
-  targets    = discovery.docker.containers.targets
   forward_to = [loki.process.docker.receiver]
 }
 

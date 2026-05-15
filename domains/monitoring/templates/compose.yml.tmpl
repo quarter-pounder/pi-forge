@@ -173,7 +173,6 @@ services:
       - /var/log:/var/log:ro
       - /srv/forgejo/log:/srv/forgejo/log:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     command:
       - run
       - /etc/alloy/config.alloy
