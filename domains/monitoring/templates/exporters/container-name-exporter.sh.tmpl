@@ -3,35 +3,77 @@ set -euo pipefail
 
 TEXTFILE_DIR="/textfile_collector"
 OUTPUT_FILE="${TEXTFILE_DIR}/container_names.prom"
-TMP_FILE="${OUTPUT_FILE}.tmp"
+TARGETS_FILE="${TEXTFILE_DIR}/container_log_targets.json"
+TMP_PROM="${OUTPUT_FILE}.tmp"
+TMP_TARGETS="${TARGETS_FILE}.tmp"
 DOCKER_SOCK="/var/run/docker.sock"
 
 mkdir -p "${TEXTFILE_DIR}"
 
-write_header() {
+write_prom_header() {
   printf '# HELP container_name_info Container ID to name mapping (1 = exists)
-' > "${TMP_FILE}"
+' > "${TMP_PROM}"
   printf '# TYPE container_name_info gauge
-' >> "${TMP_FILE}"
+' >> "${TMP_PROM}"
+}
+
+write_empty_targets() {
+  printf '[]\n' > "${TMP_TARGETS}"
+}
+
+export_container_log_targets() {
+  write_empty_targets
+
+  if [[ ! -S "${DOCKER_SOCK}" ]]; then
+    return
+  fi
+
+  if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+    return
+  fi
+
+  containers_json=$(curl -s --unix-socket "${DOCKER_SOCK}" "http://localhost/containers/json" 2>/dev/null)
+  if [[ -z "${containers_json}" ]]; then
+    return
+  fi
+
+  echo "${containers_json}" | jq -c '
+    [.[] |
+      .Id as $id |
+      (.Names[0] // "" | ltrimstr("/")) as $name |
+      select($name != "") |
+      (.Labels["com.docker.compose.service"] // $name) as $service |
+      (.Labels["com.docker.compose.project"] // "unknown") as $stack |
+      {
+        __path__: ("/var/lib/docker/containers/" + $id + "/" + $id + "-json.log"),
+        container_id: $id[0:12],
+        container: $name,
+        container_name: $name,
+        service: $service,
+        service_name: $service,
+        stack: $stack
+      }
+    ]
+  ' > "${TMP_TARGETS}"
 }
 
 export_container_names() {
   if [[ ! -S "${DOCKER_SOCK}" ]]; then
     printf '# Docker socket not available
-' >> "${TMP_FILE}"
+' >> "${TMP_PROM}"
     return
   fi
 
   if ! command -v curl >/dev/null 2>&1; then
     printf '# curl not available
-' >> "${TMP_FILE}"
+' >> "${TMP_PROM}"
     return
   fi
 
   containers_json=$(curl -s --unix-socket "${DOCKER_SOCK}" "http://localhost/containers/json" 2>/dev/null)
   if [[ -z "${containers_json}" ]]; then
     printf '# Failed to query Docker API
-' >> "${TMP_FILE}"
+' >> "${TMP_PROM}"
     return
   fi
 
@@ -39,7 +81,7 @@ export_container_names() {
     echo "${containers_json}" | jq -r '.[] | "\(.Id[0:12])\t\(.Names[0] // "" | ltrimstr("/"))"' | while IFS=$'\t' read -r container_id container_name; do
       if [[ -n "${container_id}" && -n "${container_name}" ]]; then
         printf 'container_name_info{container_id="%s",container_name="%s"} 1
-' "${container_id}" "${container_name}" >> "${TMP_FILE}"
+' "${container_id}" "${container_name}" >> "${TMP_PROM}"
       fi
     done
   else
@@ -49,13 +91,15 @@ export_container_names() {
       container_name=$(echo "${container_json}" | grep -o '"Names":\["[^"]*"' | head -1 | sed 's/"Names":\["\([^"]*\)"/\1/' | sed 's|^/||')
       if [[ -n "${short_id}" && -n "${container_name}" ]]; then
         printf 'container_name_info{container_id="%s",container_name="%s"} 1
-' "${short_id}" "${container_name}" >> "${TMP_FILE}"
+' "${short_id}" "${container_name}" >> "${TMP_PROM}"
       fi
     done
   fi
 }
 
-write_header
+write_prom_header
 export_container_names
-mv "${TMP_FILE}" "${OUTPUT_FILE}"
+mv "${TMP_PROM}" "${OUTPUT_FILE}"
 
+export_container_log_targets
+mv "${TMP_TARGETS}" "${TARGETS_FILE}"
