@@ -28,12 +28,9 @@ local.file_match "forgejo_logs" {
   ]
 }
 
-local.file_match "docker_logs" {
-  path_targets = [
-    {
-      __path__ = "/var/lib/docker/containers/*/*.log",
-    },
-  ]
+local.file "docker_log_targets" {
+  filename       = "/textfile_collector/container_log_targets.json"
+  poll_frequency = "60s"
 }
 
 // ---------- SOURCE: SYSTEM ---------------------------------------------------
@@ -53,7 +50,7 @@ loki.source.file "forgejo" {
 // ---------- SOURCE: DOCKER FILES ---------------------------------------------
 
 loki.source.file "docker_file" {
-  targets    = local.file_match.docker_logs.targets
+  targets    = encoding.from_json(coalesce(local.file.docker_log_targets.content, "[]"))
   forward_to = [loki.process.docker.receiver]
 }
 
@@ -114,10 +111,7 @@ loki.process "docker" {
     expressions = {
       timestamp = "time",
       message   = "log",
-      level     = "level",
-      container = "attrs.name",
-      service   = "attrs.labels.\"com.docker.compose.service\"",
-      stack     = "attrs.labels.\"com.docker.compose.project\"",
+      stream    = "stream",
     }
   }
 
@@ -129,13 +123,6 @@ loki.process "docker" {
   stage.labels {
     values = {
       job = "docker",
-    }
-  }
-
-  // fallback if Docker log lacks labels entirely
-  stage.static_labels {
-    values = {
-      service = "unknown",
     }
   }
 }
