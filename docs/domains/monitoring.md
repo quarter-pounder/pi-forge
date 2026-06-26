@@ -1,6 +1,6 @@
 # Monitoring Domain
 
-The monitoring domain deploys Prometheus, Alertmanager, Grafana, Loki, node-exporter, cAdvisor, and Grafana Alloy to observe the Forgejo stack, CI/CD runners, and the Raspberry Pi host. Alloy streams Docker logs directly to Loki with explicit labels.
+The monitoring domain deploys Prometheus, Alertmanager, Grafana, Loki, node-exporter, cAdvisor, and Grafana Alloy to observe the Forgejo stack, CI/CD runners, and the Raspberry Pi host. Alloy tails Docker container log files with labels supplied by `container-name-exporter`.
 
 ## Contract
 
@@ -31,7 +31,7 @@ The monitoring domain deploys Prometheus, Alertmanager, Grafana, Loki, node-expo
 
 ### Helper Services
 - **alert-suppression-exporter**: Generates metrics for alert suppression when services are manually downed
-- **container-name-exporter**: Maps Docker container IDs to names for dashboard queries
+- **container-name-exporter**: Maps Docker container IDs to names (`container_name_info`) and refreshes `container_log_targets.json` for Alloy log tailing
 
 ---
 
@@ -94,6 +94,19 @@ Container metrics include:
 - Filesystem usage
 
 The `container-name-exporter` service maintains a mapping of container IDs to names (`container_name_info` metric) for reference, but dashboard queries primarily use the `name` label from cadvisor directly.
+
+---
+
+## Log collection (Alloy / Loki)
+
+`container-name-exporter` polls the Docker API every 60 seconds and writes:
+
+- `container_names.prom` — Prometheus textfile metrics for ID-to-name mapping
+- `container_log_targets.json` — Alloy targets: `__path__`, `container`, `container_name`, `service`, `stack` (from compose labels when present)
+
+Alloy mounts the textfile directory read-only, decodes the JSON with `encoding.from_json`, and passes targets to `loki.source.file`. The docker log pipeline parses only the on-disk JSON fields (`log`, `stream`, `time`); compose metadata comes from discovery labels, not from log file contents.
+
+Grafana Loki derived fields match the `container_name` label for cross-navigation to container metrics.
 
 ---
 
