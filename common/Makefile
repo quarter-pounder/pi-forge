@@ -3,7 +3,7 @@ SHELL := /bin/bash
 .SILENT:
 .DEFAULT_GOAL := help
 
-.PHONY: help env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest vault-create vault-edit vault-view check-secrets status check-dependencies check-domain-running update update-all update-check dns-fix
+.PHONY: help check-env-file env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest check-ansible-vault check-vault-file-exists vault-create vault-edit vault-view check-secrets status check-dependencies check-domain-running update update-all update-check dns-fix
 
 ENV ?= dev
 DOMAIN ?= forgejo
@@ -17,99 +17,56 @@ VAULT_PASS := $(ROOT_DIR)/.vault_pass
 BACKUP_SCRIPT := $(ROOT_DIR)/common/scripts/backup.sh
 BACKUP_ENV := PIHOLE_API_TOKEN
 
-help:
-	@echo "Available targets:"
-	@echo "  make env ENV=<env>              - Load environment variables"
-	@echo "  make generate-metadata          - Generate metadata cache files"
-	@echo "  make diff-metadata              - Check for metadata drift"
-	@echo "  make commit-metadata            - Review and commit metadata changes"
-	@echo "  make metadata-check             - Generate metadata and fail on drift"
-	@echo "  make validate                   - Runtime validation (fast, minimal)"
-	@echo "  make validate-schema            - Schema validation (CI enforcement)"
-	@echo "  make render DOMAIN=<name> ENV=<env> - Render templates (with validation)"
-	@echo "    (set DRY_RUN=1 to print available context keys without writing files)"
-	@echo "  make render-only DOMAIN=<name>  - Render templates without validation"
-	@echo "  make render-diff DOMAIN=<name>  - Show diff of rendered files"
-	@echo "  make deploy DOMAIN=<name>       - Render and deploy domain"
-	@echo "    (set FORCE_RECREATE=1 to force container recreation)"
-	@echo "  make deploy-only DOMAIN=<name>  - Deploy domain without rendering"
-	@echo "  make restart DOMAIN=<name>      - Restart domain containers"
-	@echo "  make logs DOMAIN=<name>         - Show logs for domain containers"
-	@echo "  make ps DOMAIN=<name>           - Show container status for domain"
-	@echo "  make clean DOMAIN=<name>        - Remove generated files for domain"
-	@echo "  make diff-rendered DOMAIN=<name> - Diff rendered files vs git"
-	@echo "  make status-domain DOMAIN=<name> - Show status for specific domain"
-	@echo "  make validate-domain DOMAIN=<name> - Validate specific domain"
-	@echo "  make render-all                - Render all domains"
-	@echo "  make deploy-all                - Deploy all domains"
-	@echo "  make list-domains              - List available domains"
-	@echo "  make update-check DOMAIN=<name> - Check for available updates (all domains if not specified)"
-	@echo "  make update DOMAIN=<name>       - Apply updates for a specific domain"
-	@echo "  make update-all                - Apply updates for all domains"
-	@echo "  make down DOMAIN=<name>        - Bring domain down (with warnings and dependency checks)"
-	@echo "  make destroy DOMAIN=<name>      - Destroy domain"
-	@echo "  make manifest                   - Generate manifest"
-	@echo ""
-	@echo "GitHub Actions Runner Management:"
-	@echo "  make add-github-runner NAME=<name> REPO_URL=<url> TOKEN=<token> [LABELS=<labels>]"
-	@echo "  make github-runner-down NAME=<name> - Bring down a runner"
-	@echo "  make destroy-github-runner NAME=<name> - Destroy a runner (removes data)"
-	@echo "  make list-github-runners        - List all configured runners"
-	@echo "  make render-github-runner NAME=<name> - Render compose file for runner"
-	@echo "  make deploy-github-runner NAME=<name> - Deploy a runner"
-	@echo "  make drift-check                - Fail CI if metadata drift detected"
-	@echo ""
-	@echo "Dependency Management:"
-	@echo "  make check-dependencies DOMAIN=<name> - Check if required dependencies are running"
-	@echo "  make check-domain-running CHECK_DOMAIN=<name> - Check if a specific domain is running"
-	@echo ""
-	@echo "Vault Management:"
-	@echo "  make vault-create               - Create secrets.env.vault (uses .vault_pass when present)"
-	@echo "  make vault-edit                 - Edit secrets.env.vault"
-	@echo "  make vault-view                 - View secrets.env.vault contents"
-	@echo "  make check-secrets              - Check vault file and password file status"
-	@echo ""
-	@echo "Backup Management:"
-	@echo "  make backup                     - Run full backup (local or cloud based on BACKUP_MODE)"
-	@echo "  make backup-cloud              - Run cloud backup (requires RESTIC_REMOTE)"
-	@echo "  make backup-prune              - Prune old backup snapshots"
-	@echo ""
-	@echo "Status & Utilities:"
-	@echo "  make status                     - Show overall system status"
-	@echo "  make dns-fix                    - Run DNS fallback one-time fix (requires sudo)"
+help: ## Show this help
+	@awk 'BEGIN {FS = ":.*## "}; \
+		/^[a-zA-Z0-9_-]+:.*## / { printf "  make %-38s - %s\n", $$1, $$2 } \
+		/^##@/ { printf "\n%s\n", substr($$0, 5) }' $(MAKEFILE_LIST)
 
-env:
-	@echo "[Env] Loading environment $(ENV)"
+##@ Domain Lifecycle
+
+check-env-file:
 	@if [ ! -f "$(ROOT_DIR)/.env" ]; then \
-		echo "[Env][info] .env not found; copy config-registry/env/base.env to .env and customize it"; \
+		echo "[Env][err] .env not found; copy config-registry/env/base.env to .env and customize it"; \
 		exit 1; \
 	fi
+
+define LOAD_ENV
+	@if [ -f "$(ROOT_DIR)/.env" ]; then \
+		set -a; \
+		. "$(ROOT_DIR)/config-registry/env/base.env"; \
+		. "$(ROOT_DIR)/.env"; \
+		set +a; \
+	fi
+endef
+
+env: check-env-file ## Load environment variables for ENV
+	@echo "[Env] Loading environment $(ENV)"
 	@cd $(ROOT_DIR) && set -a && . config-registry/env/base.env && . .env && set +a
 
-generate-metadata:
+generate-metadata: ## Generate metadata cache files
 	@cd $(ROOT_DIR) && $(PYTHON) $(METADATA_SCRIPT) generate
 
-commit-metadata:
+commit-metadata: ## Review and commit metadata changes
 	@cd $(ROOT_DIR) && $(PYTHON) $(METADATA_SCRIPT) commit
 
-diff-metadata:
+diff-metadata: ## Check for metadata drift
 	@cd $(ROOT_DIR) && $(PYTHON) $(METADATA_SCRIPT) diff
 
-metadata-check:
+metadata-check: ## Generate metadata and fail on drift
 	@cd $(ROOT_DIR) && $(PYTHON) $(METADATA_SCRIPT) check
 
-drift-check:
+drift-check: ## Fail CI if metadata drift detected
 	@cd $(ROOT_DIR) && $(PYTHON) $(METADATA_SCRIPT) check || ( \
 		echo "[CI] Metadata drift detected — run 'make diff-metadata' locally" && exit 1)
 	@echo "[CI] Metadata drift check passed"
 
-validate: metadata-check
+validate: metadata-check ## Runtime validation (fast, minimal)
 	@cd $(ROOT_DIR) && bash common/validate.sh
 
-lint: validate
+lint: validate ## Alias for validate
 	@echo "[Lint] Validation completed"
 
-validate-schema:
+validate-schema: ## Schema validation (CI enforcement)
 	@echo "[Validate] Schema validation (CI enforcement)"
 	@cd $(ROOT_DIR) && \
 	if ! command -v ajv >/dev/null 2>&1; then \
@@ -122,23 +79,13 @@ validate-schema:
 		ajv validate -s config-registry/schema/$${schema}.schema.yml || exit 1; \
 	done
 
-render: validate
+render: validate render-only ## Render DOMAIN for ENV, with validation (DRY_RUN=1 for dry run)
+
+render-only: check-env-file ## Render DOMAIN for ENV, without validation
 	@echo "[Render] $(DOMAIN) for $(ENV)"
-	@if [ ! -f "$(ROOT_DIR)/.env" ]; then \
-		echo "[Render][err] .env not found; copy config-registry/env/base.env to .env and customize it"; \
-		exit 1; \
-	fi
 	@cd $(ROOT_DIR) && $(PYTHON) common/render_config.py --domain $(DOMAIN) --env $(ENV) $(if $(DRY_RUN),--dry-run)
 
-render-only:
-	@echo "[Render] $(DOMAIN) for $(ENV) (no validation)"
-	@if [ ! -f "$(ROOT_DIR)/.env" ]; then \
-		echo "[Render][err] .env not found; copy config-registry/env/base.env to .env and customize it"; \
-		exit 1; \
-	fi
-	@cd $(ROOT_DIR) && $(PYTHON) common/render_config.py --domain $(DOMAIN) --env $(ENV) $(if $(DRY_RUN),--dry-run)
-
-render-diff:
+render-diff: ## Show diff of rendered files for DOMAIN
 	@echo "[Render][Diff] $(DOMAIN)"
 	@if [ ! -d "$(ROOT_DIR)/generated/$(DOMAIN)" ]; then \
 		echo "[Render][Diff][err] No generated files found for $(DOMAIN)"; \
@@ -148,41 +95,17 @@ render-diff:
 		git diff generated/$(DOMAIN) 2>/dev/null || \
 		echo "[Render][Diff][info] No differences detected"
 
-check-domain-running:
+check-domain-running: ## Check if CHECK_DOMAIN has running containers
 	@if [ -z "$(CHECK_DOMAIN)" ]; then \
 		echo "[Check][err] CHECK_DOMAIN required (e.g., make check-domain-running CHECK_DOMAIN=postgres)"; \
 		exit 1; \
 	fi
-	@if [ -f "$(ROOT_DIR)/generated/$(CHECK_DOMAIN)/compose.yml" ]; then \
-		cd $(ROOT_DIR) && \
-		RUNNING=$$(docker compose -f generated/$(CHECK_DOMAIN)/compose.yml ps --status running --format json 2>/dev/null | \
-			$(PYTHON) -c "import sys, json; \
-				try: \
-					data = [json.loads(l) for l in sys.stdin if l.strip()]; \
-					running = [c for c in data if c.get('State') == 'running']; \
-					print('yes' if running else 'no'); \
-				except Exception as e: \
-					print('no'); \
-					sys.exit(1)" 2>/dev/null || echo "no"); \
-		if [ "$$RUNNING" = "yes" ]; then \
-			exit 0; \
-		else \
-			exit 1; \
-		fi; \
-	else \
-		exit 1; \
-	fi
+	@cd $(ROOT_DIR) && $(PYTHON) common/scripts/domain_deps.py is-running $(CHECK_DOMAIN)
 
-check-dependencies:
+check-dependencies: ## Check if DOMAIN's required dependencies are running
 	@if [ -f "$(ROOT_DIR)/config-registry/env/domains.yml" ]; then \
-		REQUIRED=$$($(PYTHON) -c "import yaml, sys; \
-			try: \
-				domains = yaml.safe_load(open('$(ROOT_DIR)/config-registry/env/domains.yml'))['domains']; \
-				target = [d for d in domains if d['name'] == '$(DOMAIN)'][0] if any(d['name'] == '$(DOMAIN)' for d in domains) else None; \
-				if target and 'requires' in target and target.get('requires'): \
-					print(' '.join(target['requires'])); \
-			except Exception as e: \
-				pass" 2>/dev/null || echo ""); \
+		cd $(ROOT_DIR) && \
+		REQUIRED=$$($(PYTHON) common/scripts/domain_deps.py requires $(DOMAIN)); \
 		if [ -n "$$REQUIRED" ]; then \
 			MISSING=""; \
 			for dep in $$REQUIRED; do \
@@ -203,42 +126,34 @@ check-dependencies:
 		fi; \
 	fi
 
-deploy: render check-dependencies
+deploy: render check-dependencies ## Render and deploy DOMAIN (FORCE_RECREATE=1 to force recreate)
 	@echo "[Deploy] $(DOMAIN)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[Deploy][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && docker compose -f generated/$(DOMAIN)/compose.yml up -d --pull always $(if $(FORCE_RECREATE),--force-recreate)
-	@if echo "$(DOMAIN)" | grep -qE "(runner|actions-runner|woodpecker)"; then \
-		echo "[Deploy] Runner/service detected - removing alert suppression marker..."; \
-		rm -f /srv/monitoring/alert-suppression/$(DOMAIN).down 2>/dev/null || true; \
-		echo "[Deploy] Alert suppression disabled for $(DOMAIN)"; \
-	fi
+	@bash $(ROOT_DIR)/common/scripts/alert-suppression-marker.sh disable $(DOMAIN)
 
-deploy-only: check-dependencies
+deploy-only: check-dependencies ## Deploy DOMAIN without rendering
 	@echo "[Deploy] $(DOMAIN) (no render)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[Deploy][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && docker compose -f generated/$(DOMAIN)/compose.yml up -d --pull always $(if $(FORCE_RECREATE),--force-recreate)
-	@if echo "$(DOMAIN)" | grep -qE "(runner|actions-runner|woodpecker)"; then \
-		echo "[Deploy] Runner/service detected - removing alert suppression marker..."; \
-		rm -f /srv/monitoring/alert-suppression/$(DOMAIN).down 2>/dev/null || true; \
-		echo "[Deploy] Alert suppression disabled for $(DOMAIN)"; \
-	fi
+	@bash $(ROOT_DIR)/common/scripts/alert-suppression-marker.sh disable $(DOMAIN)
 
-restart: check-dependencies
+restart: check-dependencies ## Restart DOMAIN containers
 	@echo "[Restart] $(DOMAIN)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[Restart][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && docker compose -f generated/$(DOMAIN)/compose.yml restart
 
-logs:
+logs: ## Show logs for DOMAIN containers
 	@echo "[Logs] $(DOMAIN)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[Logs][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && docker compose -f generated/$(DOMAIN)/compose.yml logs -f
 
-ps:
+ps: ## Show container status for DOMAIN
 	@echo "[PS] $(DOMAIN)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[PS][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && docker compose -f generated/$(DOMAIN)/compose.yml ps
 
-clean:
+clean: ## Remove generated files for DOMAIN
 	@echo "[Clean] $(DOMAIN)"
 	@if [ -d "$(ROOT_DIR)/generated/$(DOMAIN)" ]; then \
 		rm -rf "$(ROOT_DIR)/generated/$(DOMAIN)"; \
@@ -247,7 +162,7 @@ clean:
 		echo "[Clean][info] No generated files found for $(DOMAIN)"; \
 	fi
 
-diff-rendered:
+diff-rendered: ## Diff rendered files vs git for DOMAIN
 	@echo "[Diff] Rendered files for $(DOMAIN)"
 	@if [ ! -d "$(ROOT_DIR)/generated/$(DOMAIN)" ]; then \
 		echo "[Diff][err] No generated files found for $(DOMAIN)"; \
@@ -255,7 +170,7 @@ diff-rendered:
 	fi
 	@cd $(ROOT_DIR) && git diff generated/$(DOMAIN) || echo "[Diff][info] No differences detected"
 
-status-domain:
+status-domain: ## Show status for a specific DOMAIN
 	@echo "[Status] $(DOMAIN)"
 	@if [ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ]; then \
 		echo "[Status] Containers:"; \
@@ -270,7 +185,7 @@ status-domain:
 		echo "[Status][err] Domain $(DOMAIN) not found"; \
 	fi
 
-validate-domain:
+validate-domain: ## Validate a specific DOMAIN's structure
 	@echo "[Validate] $(DOMAIN)"
 	@if [ ! -d "$(ROOT_DIR)/domains/$(DOMAIN)" ]; then \
 		echo "[Validate][err] Domain $(DOMAIN) not found"; \
@@ -282,7 +197,7 @@ validate-domain:
 	fi
 	@echo "[Validate][ok] Domain $(DOMAIN) structure valid"
 
-list-domains:
+list-domains: ## List available domains
 	@echo "[List] Available domains:"
 	@cd $(ROOT_DIR) && \
 		for domain in domains/*/; do \
@@ -292,12 +207,8 @@ list-domains:
 			fi; \
 		done
 
-render-all:
+render-all: check-env-file ## Render all domains for ENV
 	@echo "[Render][All] Rendering all domains for $(ENV)"
-	@if [ ! -f "$(ROOT_DIR)/.env" ]; then \
-		echo "[Render][All][err] .env not found; copy config-registry/env/base.env to .env and customize it"; \
-		exit 1; \
-	fi
 	@cd $(ROOT_DIR) && \
 		for domain in domains/*/; do \
 			domain_name=$$(basename $$domain); \
@@ -308,7 +219,7 @@ render-all:
 		done
 	@echo "[Render][All] Completed"
 
-deploy-all:
+deploy-all: ## Deploy all domains
 	@echo "[Deploy][All] Deploying all domains"
 	@cd $(ROOT_DIR) && \
 		for domain in domains/*/; do \
@@ -322,20 +233,20 @@ deploy-all:
 
 UPDATE_SCRIPT := $(ROOT_DIR)/common/scripts/update-domains.sh
 
-update-check:
+update-check: ## Check for available updates (all domains if DOMAIN unset)
 	@bash $(UPDATE_SCRIPT) check $(if $(DOMAIN),$(DOMAIN),)
 
-update:
+update: ## Apply updates for DOMAIN
 	@if [ -z "$(DOMAIN)" ]; then \
 		echo "[Update][err] DOMAIN required (e.g., make update DOMAIN=forgejo)"; \
 		exit 1; \
 	fi
 	@bash $(UPDATE_SCRIPT) apply $(DOMAIN)
 
-update-all:
+update-all: ## Apply updates for all domains
 	@bash $(UPDATE_SCRIPT) apply-all
 
-down:
+down: ## Bring DOMAIN down (warns on critical/dependent domains, FORCE=1 to override)
 	@echo "[Down] $(DOMAIN)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[Down][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && \
@@ -345,14 +256,7 @@ down:
 		echo "[Down][WARN] Press Ctrl+C within 5 seconds to cancel..."; \
 		sleep 5; \
 	fi; \
-	DEPENDENTS=$$($(PYTHON) -c "import yaml, sys; \
-		domains = yaml.safe_load(open('config-registry/env/domains.yml'))['domains']; \
-		target = [d for d in domains if d['name'] == '$(DOMAIN)'][0] if any(d['name'] == '$(DOMAIN)' for d in domains) else None; \
-		if target: \
-			deps = [d['name'] for d in domains if 'requires' in d and '$(DOMAIN)' in d.get('requires', [])]; \
-			if deps: \
-				print(' '.join(deps)); \
-		" 2>/dev/null || echo ""); \
+	DEPENDENTS=$$($(PYTHON) common/scripts/domain_deps.py dependents $(DOMAIN)); \
 	if [ -n "$$DEPENDENTS" ]; then \
 		echo "[Down][ERR] Cannot bring down $(DOMAIN): other domains depend on it:"; \
 		for dep in $$DEPENDENTS; do \
@@ -367,37 +271,27 @@ down:
 	fi; \
 	echo "[Down] Bringing down $(DOMAIN)..."; \
 	docker compose -f generated/$(DOMAIN)/compose.yml down; \
-	if echo "$(DOMAIN)" | grep -qE "(runner|actions-runner|woodpecker)"; then \
-		echo "[Down] Runner/service detected - creating alert suppression marker..."; \
-		mkdir -p /srv/monitoring/alert-suppression; \
-		touch /srv/monitoring/alert-suppression/$(DOMAIN).down; \
-		echo "[Down] Alert suppression enabled for $(DOMAIN)"; \
-	fi
+	bash common/scripts/alert-suppression-marker.sh enable $(DOMAIN)
 
-destroy:
+destroy: ## Destroy DOMAIN (removes volumes)
 	@echo "[Destroy] $(DOMAIN)"
 	@[ -f "$(ROOT_DIR)/generated/$(DOMAIN)/compose.yml" ] || { echo "[Destroy][err] compose.yml not found for $(DOMAIN)"; exit 1; }
 	@cd $(ROOT_DIR) && docker compose -f generated/$(DOMAIN)/compose.yml down -v
 
-manifest:
+manifest: ## Generate manifest
 	@echo "[Manifest] Generating manifest..."
 	@cd $(ROOT_DIR) && bash common/generate-manifest.sh || echo "Manifest generation not yet implemented"
 
-define VAULT_CMD
-	@cd $(ROOT_DIR) && \
-	if ! command -v ansible-vault >/dev/null 2>&1; then \
-		echo "[Vault][err] ansible-vault not installed"; exit 1; \
-	fi; \
-	if [ ! -f config-registry/env/secrets.env.vault ]; then \
-		echo "[Vault][err] secrets.env.vault missing"; exit 1; \
-	fi
-endef
+##@ Vault Management
 
-vault-create:
+check-ansible-vault:
+	@command -v ansible-vault >/dev/null 2>&1 || { echo "[Vault][err] ansible-vault not installed"; exit 1; }
+
+check-vault-file-exists:
+	@[ -f "$(VAULT_FILE)" ] || { echo "[Vault][err] secrets.env.vault missing"; exit 1; }
+
+vault-create: check-ansible-vault ## Create secrets.env.vault (uses .vault_pass when present)
 	@cd $(ROOT_DIR) && \
-	if ! command -v ansible-vault >/dev/null 2>&1; then \
-		echo "[Vault][err] ansible-vault not installed"; exit 1; \
-	fi; \
 	if [ -f config-registry/env/secrets.env.vault ]; then \
 		echo "[Vault][warn] secrets.env.vault already exists"; exit 1; \
 	fi; \
@@ -407,8 +301,7 @@ vault-create:
 		ansible-vault create config-registry/env/secrets.env.vault; \
 	fi
 
-vault-edit:
-	$(VAULT_CMD)
+vault-edit: check-ansible-vault check-vault-file-exists ## Edit secrets.env.vault
 	@cd $(ROOT_DIR) && \
 	if [ -f .vault_pass ]; then \
 		ansible-vault edit config-registry/env/secrets.env.vault --vault-password-file .vault_pass; \
@@ -416,8 +309,7 @@ vault-edit:
 		ansible-vault edit config-registry/env/secrets.env.vault; \
 	fi
 
-vault-view:
-	$(VAULT_CMD)
+vault-view: check-ansible-vault check-vault-file-exists ## View secrets.env.vault contents
 	@cd $(ROOT_DIR) && \
 	if [ -f .vault_pass ]; then \
 		ansible-vault view config-registry/env/secrets.env.vault --vault-password-file .vault_pass; \
@@ -425,7 +317,7 @@ vault-view:
 		ansible-vault view config-registry/env/secrets.env.vault; \
 	fi
 
-check-secrets:
+check-secrets: ## Check vault file and password file status
 	@cd $(ROOT_DIR) && \
 	missing=0; \
 	if [ ! -f "$(VAULT_FILE)" ]; then \
@@ -444,7 +336,9 @@ check-secrets:
 		echo "[Vault][ok] secrets vault ready"; \
 	fi
 
-status:
+##@ Status & Utilities
+
+status: ## Show overall system status
 	@echo "[Status] Metadata diff:"
 	@$(MAKE) -s diff-metadata || true
 	@$(MAKE) -s check-secrets || true
@@ -453,7 +347,7 @@ status:
 
 DNS_FIX_SCRIPT := $(ROOT_DIR)/common/scripts/configure-dns-fallback.sh
 
-dns-fix:
+dns-fix: ## Run DNS fallback one-time fix (requires sudo)
 	@echo "[DNS Fix] Configuring host DNS fallback (systemd-resolved, resolv.conf)..."
 	@[ -f "$(DNS_FIX_SCRIPT)" ] || { echo "[DNS Fix][err] Script not found: $(DNS_FIX_SCRIPT)"; exit 1; }
 	@cd $(ROOT_DIR) && sudo bash "$(DNS_FIX_SCRIPT)"
@@ -461,7 +355,9 @@ dns-fix:
 .PHONY: add-github-runner github-runner-down destroy-github-runner list-github-runners render-github-runner deploy-github-runner
 GITHUB_RUNNER_MANAGER := $(ROOT_DIR)/common/scripts/github-runner-manager.sh
 
-add-github-runner:
+##@ GitHub Actions Runner Management
+
+add-github-runner: ## Add a runner (NAME=, REPO_URL=, TOKEN=, [LABELS=], [DOCKER_ENABLED=])
 	@if [ -z "$(NAME)" ]; then \
 		echo "[GitHub Runner][err] NAME required"; \
 		echo "Usage: make add-github-runner NAME=<name> REPO_URL=<url> TOKEN=<token> [LABELS=<labels>] [DOCKER_ENABLED=true]"; \
@@ -473,31 +369,31 @@ add-github-runner:
 		$(if $(LABELS),--labels "$(LABELS)",) \
 		$(if $(DOCKER_ENABLED),--docker-enabled "$(DOCKER_ENABLED)",)
 
-github-runner-down:
+github-runner-down: ## Bring down a runner (NAME=)
 	@if [ -z "$(NAME)" ]; then \
 		echo "[GitHub Runner][err] NAME required (e.g., make github-runner-down NAME=pi-runner)"; \
 		exit 1; \
 	fi
 	@bash $(GITHUB_RUNNER_MANAGER) down $(NAME)
 
-destroy-github-runner:
+destroy-github-runner: ## Destroy a runner, removes data (NAME=)
 	@if [ -z "$(NAME)" ]; then \
 		echo "[GitHub Runner][err] NAME required (e.g., make destroy-github-runner NAME=pi-runner)"; \
 		exit 1; \
 	fi
 	@bash $(GITHUB_RUNNER_MANAGER) destroy $(NAME)
 
-list-github-runners:
+list-github-runners: ## List all configured runners
 	@bash $(GITHUB_RUNNER_MANAGER) list
 
-render-github-runner:
+render-github-runner: ## Render compose file for a runner (NAME=)
 	@if [ -z "$(NAME)" ]; then \
 		echo "[GitHub Runner][err] NAME required (e.g., make render-github-runner NAME=pi-runner)"; \
 		exit 1; \
 	fi
 	@bash $(GITHUB_RUNNER_MANAGER) render $(NAME)
 
-deploy-github-runner:
+deploy-github-runner: ## Deploy a runner (NAME=)
 	@if [ -z "$(NAME)" ]; then \
 		echo "[GitHub Runner][err] NAME required (e.g., make deploy-github-runner NAME=pi-runner)"; \
 		exit 1; \
@@ -505,32 +401,20 @@ deploy-github-runner:
 	@bash $(GITHUB_RUNNER_MANAGER) deploy $(NAME)
 
 .PHONY: backup backup-cloud backup-prune
-backup:
-	@if [ -f "$(ROOT_DIR)/.env" ]; then \
-		set -a; \
-		. "$(ROOT_DIR)/config-registry/env/base.env"; \
-		. "$(ROOT_DIR)/.env"; \
-		set +a; \
-	fi; \
-	BACKUP_MODE=${BACKUP_MODE:-manual} bash $(BACKUP_SCRIPT)
 
-backup-prune:
-	@if [ -f "$(ROOT_DIR)/.env" ]; then \
-		set -a; \
-		. "$(ROOT_DIR)/config-registry/env/base.env"; \
-		. "$(ROOT_DIR)/.env"; \
-		set +a; \
-	fi; \
-	BACKUP_MODE=prune BACKUP_PRUNE=1 bash $(BACKUP_SCRIPT)
+##@ Backup Management
 
-backup-cloud:
-	@if [ -f "$(ROOT_DIR)/.env" ]; then \
-		set -a; \
-		. "$(ROOT_DIR)/config-registry/env/base.env"; \
-		. "$(ROOT_DIR)/.env"; \
-		set +a; \
-	fi; \
-	if [ -z "$${RESTIC_REMOTE:-}" ]; then \
+backup: ## Run full backup (local or cloud based on BACKUP_MODE)
+	$(LOAD_ENV)
+	@BACKUP_MODE=$${BACKUP_MODE:-manual} bash $(BACKUP_SCRIPT)
+
+backup-prune: ## Prune old backup snapshots
+	$(LOAD_ENV)
+	@BACKUP_MODE=prune BACKUP_PRUNE=1 bash $(BACKUP_SCRIPT)
+
+backup-cloud: ## Run cloud backup (requires RESTIC_REMOTE)
+	$(LOAD_ENV)
+	@if [ -z "$${RESTIC_REMOTE:-}" ]; then \
 		echo "[Backup][err] RESTIC_REMOTE not set (define in .env)"; \
 		exit 1; \
 	fi; \
