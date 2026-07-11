@@ -103,16 +103,15 @@ services:
       - node-exporter
 
   container-name-exporter:
-    image: alpine:3.19
+    build:
+      context: ./exporters
+      dockerfile: container-name-exporter.Dockerfile
     container_name: monitoring-container-name-exporter
     restart: always
     command:
       - /bin/sh
       - -c
       - |
-        until apk add --no-cache bash curl jq >/dev/null 2>&1; do
-          sleep 5
-        done
         printf '[]\n' > /textfile_collector/container_log_targets.json
         exec bash /scripts/container-name-exporter.sh
     volumes:
