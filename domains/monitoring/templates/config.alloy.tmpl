@@ -30,7 +30,7 @@ local.file_match "forgejo_logs" {
 
 local.file "docker_log_targets" {
   filename       = "/textfile_collector/container_log_targets.json"
-  poll_frequency = "60s"
+  poll_frequency = "10s"
 }
 
 // ---------- SOURCE: SYSTEM ---------------------------------------------------

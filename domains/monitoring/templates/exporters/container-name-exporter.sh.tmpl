@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
 TEXTFILE_DIR="/textfile_collector"
 OUTPUT_FILE="${TEXTFILE_DIR}/container_names.prom"
@@ -7,6 +7,7 @@ TARGETS_FILE="${TEXTFILE_DIR}/container_log_targets.json"
 TMP_PROM="${OUTPUT_FILE}.tmp"
 TMP_TARGETS="${TARGETS_FILE}.tmp"
 DOCKER_SOCK="/var/run/docker.sock"
+FALLBACK_INTERVAL="${FALLBACK_INTERVAL:-300}"
 
 mkdir -p "${TEXTFILE_DIR}"
 
@@ -97,9 +98,43 @@ export_container_names() {
   fi
 }
 
-write_prom_header
-export_container_names
-mv "${TMP_PROM}" "${OUTPUT_FILE}"
+export_once() {
+  write_prom_header
+  export_container_names
+  mv "${TMP_PROM}" "${OUTPUT_FILE}"
 
-export_container_log_targets
-mv "${TMP_TARGETS}" "${TARGETS_FILE}"
+  export_container_log_targets
+  mv "${TMP_TARGETS}" "${TARGETS_FILE}"
+}
+
+# ---------- EVENT STREAM ------------------------------------------------------
+# discovery.docker in Alloy misses container replacement (grafana/alloy#3054),
+# so we watch the Docker event stream directly and re-export on every
+# start/die/destroy instead of polling on a timer.
+
+watch_events() {
+  curl -sN --unix-socket "${DOCKER_SOCK}" "http://localhost/events" 2>/dev/null \
+    | jq -c 'select(.Type == "container" and (.Action == "start" or .Action == "die" or .Action == "destroy"))' 2>/dev/null
+}
+
+export_once
+
+# Periodic safety net in case an event is ever missed or the stream silently stalls.
+( while true; do sleep "${FALLBACK_INTERVAL}"; export_once; done ) &
+
+while true; do
+  if [[ ! -S "${DOCKER_SOCK}" ]]; then
+    sleep 5
+    continue
+  fi
+
+  while IFS= read -r _event; do
+    # drain any additional events from the same burst (e.g. compose recreate)
+    # into a single export instead of one per container.
+    while IFS= read -r -t 0.3 _more; do :; done
+    export_once
+  done < <(watch_events)
+
+  # curl exited: socket hiccup or docker daemon restart. Back off and reconnect.
+  sleep 2
+done
