@@ -110,7 +110,9 @@ services:
       - /bin/sh
       - -c
       - |
-        apk add --no-cache bash curl jq >/dev/null 2>&1 || true
+        until apk add --no-cache bash curl jq >/dev/null 2>&1; do
+          sleep 5
+        done
         printf '[]\n' > /textfile_collector/container_log_targets.json
         exec bash /scripts/container-name-exporter.sh
     volumes:
