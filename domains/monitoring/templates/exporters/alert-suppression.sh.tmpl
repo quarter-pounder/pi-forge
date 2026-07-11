@@ -27,6 +27,7 @@ check_suppression() {
 alert_suppression_enabled{runner="woodpecker"} $(check_suppression "woodpecker")
 alert_suppression_enabled{runner="woodpecker-runner"} $(check_suppression "woodpecker-runner")
 alert_suppression_enabled{runner="forgejo-actions-runner"} $(check_suppression "forgejo-actions-runner")
+alert_suppression_enabled{runner="external-runner"} $(check_suppression "external-runner")
 EOF
 
     # Dynamically discover GitHub Actions runners

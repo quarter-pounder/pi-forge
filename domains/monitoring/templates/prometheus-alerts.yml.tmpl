@@ -184,7 +184,7 @@ groups:
       - alert: RunnerSuppressionActive
         expr: |
           label_replace(
-            alert_suppression_enabled{runner=~"woodpecker|woodpecker-runner|forgejo-actions-runner|github-actions-runner"} == 1,
+            alert_suppression_enabled{runner=~"woodpecker|woodpecker-runner|forgejo-actions-runner|github-actions-runner|external-runner"} == 1,
             "runner_name", "$1", "runner", "(.*)"
           )
         for: 10s
@@ -264,7 +264,7 @@ groups:
         {% endraw %}
 {% if EXTERNAL_RUNNER_METRICS_IP %}
       - alert: ExternalRunnerDown
-        expr: up{job="external-runner"} == 0
+        expr: up{job="external-runner"} == 0 and (alert_suppression_enabled{runner="external-runner"} == 0 or absent(alert_suppression_enabled{runner="external-runner"}))
         for: 5m
         labels:
           severity: warning

@@ -3,7 +3,7 @@ SHELL := /bin/bash
 .SILENT:
 .DEFAULT_GOAL := help
 
-.PHONY: help check-env-file env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest check-ansible-vault check-vault-file-exists vault-create vault-edit vault-view check-secrets status check-dependencies check-domain-running update update-all update-check dns-fix
+.PHONY: help check-env-file env generate-metadata commit-metadata diff-metadata metadata-check drift-check validate lint validate-schema render render-only render-diff deploy deploy-only restart logs ps clean diff-rendered status-domain validate-domain render-all deploy-all list-domains down destroy manifest runner-suppress runner-unsuppress check-ansible-vault check-vault-file-exists vault-create vault-edit vault-view check-secrets status check-dependencies check-domain-running update update-all update-check dns-fix
 
 ENV ?= dev
 DOMAIN ?= forgejo
@@ -281,6 +281,14 @@ destroy: ## Destroy DOMAIN (removes volumes)
 manifest: ## Generate manifest
 	@echo "[Manifest] Generating manifest..."
 	@cd $(ROOT_DIR) && bash common/generate-manifest.sh || echo "Manifest generation not yet implemented"
+
+runner-suppress: ## Suppress down-alerts for a runner not managed by this repo, e.g. external-runner (NAME=)
+	@if [ -z "$(NAME)" ]; then echo "[Runner][err] NAME required (e.g., make runner-suppress NAME=external-runner)"; exit 1; fi
+	@bash $(ROOT_DIR)/common/scripts/alert-suppression-marker.sh enable $(NAME)
+
+runner-unsuppress: ## Re-enable down-alerts for a runner suppressed via runner-suppress (NAME=)
+	@if [ -z "$(NAME)" ]; then echo "[Runner][err] NAME required (e.g., make runner-unsuppress NAME=external-runner)"; exit 1; fi
+	@bash $(ROOT_DIR)/common/scripts/alert-suppression-marker.sh disable $(NAME)
 
 ##@ Vault Management
 

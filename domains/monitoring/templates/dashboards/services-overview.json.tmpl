@@ -28,7 +28,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
-          "expr": "sum(1 - clamp_max(max_over_time(up[5m]), 1))",
+          "expr": "sum(1 - clamp_max(max_over_time(up{job!=\"external-runner\"}[5m]), 1)) + (count(up{job=\"external-runner\"} == 0 and (alert_suppression_enabled{runner=\"external-runner\"} == 0 or absent(alert_suppression_enabled{runner=\"external-runner\"}))) or vector(0))",
           "refId": "A"
         }
       ],
